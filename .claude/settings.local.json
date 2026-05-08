@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(cp .env.example .env)",
+      "Bash(node backend/server.js)",
+      "Bash(echo \"Started PID $!\")",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(taskkill /F /PID 12108)",
+      "Bash(curl -s http://localhost:4100/api/health)",
+      "Bash(curl -s \"http://localhost:4100/api/emissions/time?preset=thisMonth\")",
+      "Bash(taskkill /F /PID 12315)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :4100)",
+      "Bash(taskkill /F /PID 28236)",
+      "Bash(cmd.exe /c \"taskkill /F /PID 28236\")",
+      "Bash(cmd *)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(curl -s \"http://localhost:4100/api/emissions/time?preset=last30\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('granularity:', d['granularity']\\); print\\('series:'\\); [print\\(' ', s\\) for s in d['series']]; print\\('totals:', d['totals']\\)\")",
+      "Bash(curl -s \"http://localhost:4100/api/emissions/customers?preset=last30\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('totals:', d['totals']\\); print\\('top:'\\); [print\\(' ', c['customerName'], c['totalEmissions'], 'kg', c['totalShipments'], 'shipments'\\) for c in d['customers'][:4]]\")",
+      "Bash(curl -s \"http://localhost:4100/api/emissions/customer/VOLV/shipments?preset=last30\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('customerName:', d['customerName']\\); print\\('totals:', d['totals']\\); s=d['shipments'][0] if d['shipments'] else None; print\\('first shipment:', s\\)\")",
+      "Bash(curl -s -o /tmp/test.xlsx -w \"status=%{http_code} size=%{size_download} type=%{content_type}\\\\n\" \"http://localhost:4100/api/reports/customer/VOLV.xlsx?preset=last30\")",
+      "Read(//tmp/**)",
+      "Bash(xxd)",
+      "Bash(curl -s -o /tmp/test.pdf -w \"status=%{http_code} size=%{size_download} type=%{content_type}\\\\n\" \"http://localhost:4100/api/certificate/customer/VOLV.pdf?preset=last30\")",
+      "Bash(curl *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(len\\(d['customers']\\),'customers'\\); print\\('first 3:', [c['name'] for c in d['customers'][:3]]\\)\")"
+    ]
+  }
+}
