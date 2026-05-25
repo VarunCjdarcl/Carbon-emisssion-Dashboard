@@ -3,7 +3,7 @@
 const TimeView = (() => {
   let chart = null;
 
-  async function load(period) {
+  async function load(period, { signal } = {}) {
     const params = new URLSearchParams();
     params.set('preset', period.preset || 'thisMonth');
     if (period.preset === 'custom' && period.from && period.till) {
@@ -11,11 +11,13 @@ const TimeView = (() => {
     }
     let data;
     try {
-      data = await Util.api('/api/emissions/time?' + params.toString());
+      data = await Util.api('/api/emissions/time?' + params.toString(), { signal });
     } catch (e) {
+      if (Util.isAbortError(e)) return; // user moved on — don't toast
       Util.toast(e.message, 'error');
       return;
     }
+    if (signal?.aborted) return; // late return — supervisor moved on
     renderKpis(data);
     renderChart(data);
     renderTotalEmission(data);

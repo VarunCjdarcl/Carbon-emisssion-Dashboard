@@ -13,7 +13,6 @@ const Period = (() => {
     { id: 'last2months',   label: 'Last 2 Months',  sub: 'By week' },
     { id: 'last5months',   label: 'Last 5 Months',  sub: 'By month' },
     { id: 'last1year',     label: 'Last 1 Year',    sub: 'By month' },
-    { id: 'last2years',    label: 'Last 2 Years',   sub: 'By quarter' },
     { id: 'custom',        label: 'Custom Range',   sub: 'Pick on calendar' },
   ];
 
@@ -105,7 +104,6 @@ const Period = (() => {
     if (['thisWeek','previousWeek','last7'].includes(id)) return 'day';
     if (['thisMonth','previousMonth','last30','last2months'].includes(id)) return 'week';
     if (['last5months','last1year'].includes(id)) return 'month';
-    if (id === 'last2years') return 'quarter';
     return 'auto';
   }
 
@@ -128,7 +126,6 @@ const Period = (() => {
       case 'last2months': return { from: startOfDay(addDays(now,-59)).getTime(), till: endOfDay(now).getTime() };
       case 'last5months': return { from: startOfDay(addDays(now,-149)).getTime(), till: endOfDay(now).getTime() };
       case 'last1year': return { from: startOfDay(addDays(now,-364)).getTime(), till: endOfDay(now).getTime() };
-      case 'last2years': return { from: startOfDay(addDays(now,-729)).getTime(), till: endOfDay(now).getTime() };
       default: return null;
     }
   }
@@ -184,6 +181,11 @@ const Period = (() => {
   function applyAndClose() {
     if (!state.from || !state.till) {
       Util.toast('Please pick a complete date range.', 'error');
+      return;
+    }
+    const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000; // 1 year, inclusive
+    if (state.till - state.from > MAX_RANGE_MS) {
+      Util.toast('Date range is limited to a maximum of 1 year.', 'error');
       return;
     }
     document.getElementById('periodDropdown').hidden = true;

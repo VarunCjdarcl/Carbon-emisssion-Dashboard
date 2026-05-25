@@ -36,7 +36,7 @@ const EmailModal = (() => {
       today: 'Today', yesterday: 'Yesterday', thisWeek: 'This Week', previousWeek: 'Previous Week',
       last7: 'Last 7 Days', thisMonth: 'This Month', previousMonth: 'Previous Month',
       last30: 'Last 30 Days', last2months: 'Last 2 Months', last5months: 'Last 5 Months',
-      last1year: 'Last 1 Year', last2years: 'Last 2 Years', custom: 'Custom Range',
+      last1year: 'Last 1 Year', custom: 'Custom Range',
     }[p] || p);
   }
 

@@ -29,6 +29,26 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/api/rollup/status', (req, res) => {
+  const rollup = require('./services/rollup');
+  res.json(rollup.getRollupStats());
+});
+
+app.get('/api/etl/status', (req, res) => {
+  const store = require('./services/shipmentStore');
+  const stats = store.getEtlStatus();
+  res.json({
+    enabled: store.isEtlEnabled(),
+    shipments: stats.total,
+    oldestShipment: stats.oldest ? new Date(stats.oldest).toISOString() : null,
+    newestShipment: stats.newest ? new Date(stats.newest).toISOString() : null,
+    syncedFrom: stats.syncedFrom ? new Date(stats.syncedFrom).toISOString() : null,
+    syncedTill: stats.syncedTill ? new Date(stats.syncedTill).toISOString() : null,
+    lastSyncAt: stats.lastSyncAt ? new Date(stats.lastSyncAt).toISOString() : null,
+    dbPath: stats.dbPath,
+  });
+});
+
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 app.use(express.static(PUBLIC_DIR, { maxAge: '1h', index: 'index.html' }));
 
@@ -40,39 +60,29 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 app.listen(PORT, () => {
   console.log(`Carbon Emission Dashboard listening on http://localhost:${PORT}`);
   console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
+  // Start the ETL worker.  In live mode this kicks off either an initial
+  // backfill (empty DB) or an incremental catch-up (existing DB), and then
+  // schedules periodic incremental + full-refresh syncs.  All dashboard reads
+  // go through shipmentStore, which prefers SQLite and falls back to TMS only
+  // when the DB hasn't covered the requested range yet.
+  const etl = require('./services/etl');
+  etl.start();
 
-  // Pre-warm common ranges so the dashboard's first page load hits a hot
-  // cache, and refresh them periodically so the cache never goes cold while
-  // the server is alive.  Pre-warms run in PARALLEL — TMS handles 3 in-flight
-  // queries fine, and parallel cuts startup warm time roughly in half.
-  // Fire-and-forget; we don't block server readiness on it.
-  if ((process.env.DEMO_MODE || 'true').toLowerCase() !== 'true') {
-    const tms = require('./services/tmsClient');
-    const { resolvePreset } = require('./services/dateRange');
-    const PRESETS = ['thisMonth', 'last30', 'previousMonth', 'last2months'];
+  // Rollup table: dashboard charts read pre-aggregated daily sums (sub-100ms
+  // even for a 1-year window).  Rebuild it on startup so we never serve from a
+  // stale cache, then refresh nightly at 02:00 IST after the ETL has pulled
+  // the latest data.
+  const rollup = require('./services/rollup');
+  setTimeout(() => {
+    try { rollup.refreshAll(); }
+    catch (err) { console.error('[rollup] initial build failed:', err.message); }
+  }, 2000); // give ETL a head-start so its first chunk lands first
 
-    async function warmOne(preset) {
-      const t0 = Date.now();
-      try {
-        const items = await tms.getShipmentsInRange(resolvePreset(preset));
-        console.log(`[warm] ${preset} cached ${items.length} shipments in ${Date.now() - t0}ms`);
-      } catch (err) {
-        console.warn(`[warm] ${preset} failed`, err.message || err);
-      }
-    }
-    async function warmAll() {
-      // Warm 2 presets at a time — at concurrency=4 per slice × 2 slices
-      // (road+rail) × 2 presets = ~16 concurrent TMS calls peak.  More than
-      // that and TMS starts 504-ing.
-      const PRESET_PARALLELISM = 2;
-      for (let i = 0; i < PRESETS.length; i += PRESET_PARALLELISM) {
-        await Promise.all(PRESETS.slice(i, i + PRESET_PARALLELISM).map(warmOne));
-      }
-    }
-
-    warmAll();
-    // Refresh every 25 min — comfortably under the 30-min cache TTL so warm
-    // ranges never cool off.
-    setInterval(warmAll, 25 * 60 * 1000);
-  }
+  rollup.scheduleDaily2amIst(async () => {
+    console.log('[rollup] 02:00 IST refresh — running ETL full refresh then rebuilding rollup');
+    try { await etl.syncFullRefresh(); }
+    catch (err) { console.warn('[rollup] 02:00 ETL full refresh failed:', err.message); }
+    try { rollup.refreshLastYear(); }
+    catch (err) { console.error('[rollup] 02:00 rollup refresh failed:', err.message); }
+  });
 });

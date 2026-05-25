@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const router = express.Router();
 
-const tms = require('../services/tmsClient');
+const db = require('../services/db');
 const { resolvePreset, presetLabel } = require('../services/dateRange');
 const { generateCertificatePdf, generateCertificateHtml, LOGO_PATH } = require('../services/certificate');
 const { sendCertificateEmail } = require('../services/mailer');
@@ -14,27 +14,19 @@ const auditLog = [];
 
 async function buildCertificatePayload({ code, preset, from, till }) {
   const range = resolvePreset(preset, { from, till });
-  const shipments = await tms.getShipmentsInRange(range);
-  const filtered = shipments.filter(s => s.customerCode === code);
-  let totalEmission = 0;
-  let totalAversionRail = 0;
-  for (const s of filtered) {
-    if (typeof s.carbonEmissionValue === 'number') totalEmission += s.carbonEmissionValue;
-    if (typeof s.aversionValue_rail === 'number') totalAversionRail += s.aversionValue_rail;
-  }
-  const customerName = filtered[0]?.customerName || code;
-  const customerEmail = filtered[0]?.customerEmail || '';
+  // Single indexed aggregate query — no row materialization.
+  const t = db.getCustomerTotals(code, range.from, range.till);
   return {
-    customerName,
-    customerEmail,
+    customerName: t.customerName,
+    customerEmail: t.customerEmail,
     periodLabel: presetLabel(preset),
     fromDateLabel: new Date(range.from).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }),
     toDateLabel: new Date(range.till).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }),
-    totalEmission,
-    totalAversionRail,
+    totalEmission: t.totalEmission,
+    totalAversionRail: t.totalAversionRail,
     methodUsed: 'Road & Rail',
     range,
-    shipmentCount: filtered.length,
+    shipmentCount: t.shipmentCount,
   };
 }
 

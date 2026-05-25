@@ -31,18 +31,38 @@
     CustomerFilter.show(isCustomer);
   }
 
+  // ---- Request supervisor ----
+  // Only one refresh() can be in-flight at a time. New refresh aborts old.
+  // The loader is deferred 200ms so cached/instant responses don't flicker.
+  let activeController = null;
+  let loaderTimer = null;
+
   async function refresh() {
+    if (activeController) activeController.abort();
+    const controller = new AbortController();
+    activeController = controller;
     const period = Period.getCurrent();
     const cust = CustomerFilter.getCurrent();
-    showLoading(true);
+
+    // Defer loader so cached (sub-200ms) responses never show it
+    clearTimeout(loaderTimer);
+    loaderTimer = setTimeout(() => {
+      if (controller === activeController) showLoading(true);
+    }, 200);
+
     try {
       if (state.view === 'time') {
-        await TimeView.load(period);
+        await TimeView.load(period, { signal: controller.signal });
       } else {
-        await CustomerView.load(period, cust.code);
+        await CustomerView.load(period, cust.code, { signal: controller.signal });
       }
     } finally {
-      showLoading(false);
+      // Only the latest refresh hides the loader; aborted ones leave it alone
+      if (controller === activeController) {
+        clearTimeout(loaderTimer);
+        showLoading(false);
+        activeController = null;
+      }
     }
   }
 

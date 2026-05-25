@@ -30,6 +30,12 @@ const Util = (() => {
     return res.json();
   }
 
+  // True when the error came from an AbortController.abort() call.
+  // Lets callers silently ignore cancellations instead of toasting them.
+  function isAbortError(e) {
+    return e && (e.name === 'AbortError' || e.code === 20 || e.code === 'ABORT_ERR');
+  }
+
   function toast(message, kind = '') {
     const el = document.getElementById('toast');
     el.className = 'toast ' + kind;
@@ -56,5 +62,5 @@ const Util = (() => {
     return { value: kg, unit: 'kg CO₂' };
   }
 
-  return { fmtNum, fmtDate, fmtDateInput, api, toast, debounce, escapeHtml, compactCO2 };
+  return { fmtNum, fmtDate, fmtDateInput, api, toast, debounce, escapeHtml, compactCO2, isAbortError };
 })();

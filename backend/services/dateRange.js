@@ -38,6 +38,7 @@ function resolvePreset(preset, opts = {}) {
     case 'previousMonth': {
       const x = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const e = new Date(now.getFullYear(), now.getMonth(), 0);
+      const y = new Date(now.getFullYear(), now.getMonth(), 2);
       from = startOfDay(x); till = endOfDay(e); break;
     }
     case 'last30':
@@ -48,8 +49,6 @@ function resolvePreset(preset, opts = {}) {
       from = startOfDay(addDays(now, -149)); till = endOfDay(now); break;
     case 'last1year':
       from = startOfDay(addDays(now, -364)); till = endOfDay(now); break;
-    case 'last2years':
-      from = startOfDay(addDays(now, -729)); till = endOfDay(now); break;
     case 'custom':
     default: {
       if (!opts.from || !opts.till) {
@@ -61,6 +60,11 @@ function resolvePreset(preset, opts = {}) {
       }
       break;
     }
+  }
+  // Business cap: a single query must not span more than 1 year.
+  const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;
+  if (till.getTime() - from.getTime() > MAX_RANGE_MS) {
+    from = startOfDay(addDays(till, -365));
   }
   return { from: from.getTime(), till: till.getTime() };
 }
@@ -78,7 +82,6 @@ function presetLabel(preset) {
     last2months: 'Last 2 Months',
     last5months: 'Last 5 Months',
     last1year: 'Last 1 Year',
-    last2years: 'Last 2 Years',
     custom: 'Custom Range',
   };
   return map[preset] || preset;

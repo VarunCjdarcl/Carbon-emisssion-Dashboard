@@ -11,7 +11,7 @@ const http = axios.create({
   headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
 });
 
-// Per-uuid cache for full shipment detail (used by drill-down only).
+// Per-uuid cache for full shipment detail (used by drill-down only).0
 const detailCache = new Map();
 
 // Cache list results by date-range query.  The TMS list endpoint at size=5000
@@ -295,6 +295,8 @@ async function getShipmentDetail(shipmentId) {
   }
 }
 
+// Live (TMS-direct) read path.  Used by the ETL worker to populate SQLite
+// and as a fallback when the DB doesn't cover the requested range.
 async function getShipmentsInRange({ from, till }) {
   if (DEMO) {
     return MOCK_SHIPMENTS.filter(s => s.completionTime >= from && s.completionTime <= till);
@@ -351,4 +353,8 @@ module.exports = {
   getShipmentDetail,
   getShipmentsInRange,
   listCustomers,
+  // Exposed so the ETL worker can pull-and-store directly without going
+  // through the in-memory cache layer.
+  fetchAllShipmentsInRange,
+  mapShipment,
 };

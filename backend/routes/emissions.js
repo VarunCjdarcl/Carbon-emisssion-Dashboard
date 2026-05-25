@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
 
-const tms = require('../services/tmsClient');
+const db = require('../services/db');
+const store = require('../services/shipmentStore');
+const rollup = require('../services/rollup');
 const { resolvePreset, presetLabel } = require('../services/dateRange');
-const { aggregateByTime, aggregateByCustomer } = require('../services/aggregator');
 
-// GET /api/emissions/time?preset=thisMonth&from=&till=
+// GET /api/emissions/time?preset=thisMonth&from=&till=&customer=
 router.get('/time', async (req, res, next) => {
   try {
-    const { preset = 'thisMonth', from, till } = req.query;
+    const { preset = 'thisMonth', from, till, customer } = req.query;
     const range = resolvePreset(preset, { from, till });
-    const shipments = await tms.getShipmentsInRange(range);
-    const agg = aggregateByTime(shipments, { ...range, preset });
-
+    const agg = rollup.aggregateTime({ ...range, preset, customerCode: customer });
     res.json({
       preset,
       presetLabel: presetLabel(preset),
@@ -29,8 +28,7 @@ router.get('/customers', async (req, res, next) => {
   try {
     const { preset = 'thisMonth', from, till, customer } = req.query;
     const range = resolvePreset(preset, { from, till });
-    const shipments = await tms.getShipmentsInRange(range);
-    const agg = aggregateByCustomer(shipments, { customerCode: customer });
+    const agg = rollup.aggregateByCustomer({ ...range, customerCode: customer });
     res.json({
       preset,
       presetLabel: presetLabel(preset),
@@ -45,11 +43,7 @@ router.get('/customers', async (req, res, next) => {
 // GET /api/customers — full list for the searchable dropdown
 router.get('/customer-list', async (req, res, next) => {
   try {
-    // Ensure the listCache has data for the default landing view, otherwise
-    // listCustomers() returns [] on first page load (it derives from cache).
-    const range = resolvePreset('thisMonth');
-    await tms.getShipmentsInRange(range);
-    const list = tms.listCustomers();
+    const list = store.listCustomers();
     res.json({ customers: list });
   } catch (err) {
     next(err);
@@ -62,10 +56,8 @@ router.get('/customer/:code/shipments', async (req, res, next) => {
     const { code } = req.params;
     const { preset = 'thisMonth', from, till } = req.query;
     const range = resolvePreset(preset, { from, till });
-    const shipments = await tms.getShipmentsInRange(range);
-    const filtered = shipments
-      .filter(s => s.customerCode === code)
-      .sort((a, b) => b.completionTime - a.completionTime);
+    // Indexed query on (customer_code, completion_time) — no full-table scan.
+    const filtered = db.getShipmentsByCustomerInRange(code, range.from, range.till);
 
     res.json({
       preset,

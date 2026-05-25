@@ -4,7 +4,7 @@ const CustomerView = (() => {
   let chart = null;
   let lastData = null;
 
-  async function load(period, customerCode) {
+  async function load(period, customerCode, { signal } = {}) {
     const params = new URLSearchParams();
     params.set('preset', period.preset || 'thisMonth');
     if (period.preset === 'custom' && period.from && period.till) {
@@ -13,11 +13,13 @@ const CustomerView = (() => {
     if (customerCode) params.set('customer', customerCode);
     let data;
     try {
-      data = await Util.api('/api/emissions/customers?' + params.toString());
+      data = await Util.api('/api/emissions/customers?' + params.toString(), { signal });
     } catch (e) {
+      if (Util.isAbortError(e)) return; // user moved on — don't toast
       Util.toast(e.message, 'error');
       return;
     }
+    if (signal?.aborted) return; // late return — supervisor moved on
     lastData = data;
 
     document.getElementById('customerSubtitle').textContent =
@@ -34,22 +36,15 @@ const CustomerView = (() => {
 
   function renderKpis({ customers, totals, presetLabel }) {
     const totalEmissions = customers.reduce((a, c) => a + c.totalEmissions, 0);
-    const totalRail = customers.reduce((a, c) => a + c.totalRail, 0);
     const totalShipments = customers.reduce((a, c) => a + c.totalShipments, 0);
     const grid = document.getElementById('kpiGrid');
     const teCompact = Util.compactCO2(totalEmissions);
-    const trCompact = Util.compactCO2(totalRail);
     grid.innerHTML = `
       <div class="kpi-tile orange">
         <div class="kpi-label">Total Emissions</div>
         <div class="kpi-value">${Util.fmtNum(teCompact.value, teCompact.unit === 'tonnes CO₂' ? 2 : 0)}</div>
         <div class="kpi-unit">${teCompact.unit}</div>
         <div class="kpi-delta neutral">${presetLabel}</div>
-      </div>
-      <div class="kpi-tile green">
-        <div class="kpi-label">Rail Aversion</div>
-        <div class="kpi-value">${Util.fmtNum(trCompact.value, trCompact.unit === 'tonnes CO₂' ? 2 : 0)}</div>
-        <div class="kpi-unit">${trCompact.unit}</div>
       </div>
       <div class="kpi-tile navy">
         <div class="kpi-label">Customers</div>

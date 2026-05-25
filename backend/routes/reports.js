@@ -2,7 +2,7 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const router = express.Router();
 
-const tms = require('../services/tmsClient');
+const db = require('../services/db');
 const { resolvePreset, presetLabel } = require('../services/dateRange');
 
 // GET /api/reports/customer/:code.xlsx?preset=&from=&till=
@@ -11,8 +11,7 @@ router.get('/customer/:code.xlsx', async (req, res, next) => {
     const { code } = req.params;
     const { preset = 'thisMonth', from, till } = req.query;
     const range = resolvePreset(preset, { from, till });
-    const shipments = await tms.getShipmentsInRange(range);
-    const filtered = shipments.filter(s => s.customerCode === code);
+    const filtered = db.getShipmentsByCustomerInRange(code, range.from, range.till);
     const customerName = (filtered[0]?.customerName || code).replace(/[^a-zA-Z0-9]+/g, '_');
 
     const wb = new ExcelJS.Workbook();

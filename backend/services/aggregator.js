@@ -92,8 +92,6 @@ function pickGranularity(preset, from, till) {
     case 'last5months':
     case 'last1year':
       return 'month';
-    case 'last2years':
-      return 'quarter';
     default: {
       // Custom range — auto-pick from window length
       const days = Math.max(1, Math.round((till - from) / 86400000));
@@ -229,4 +227,7 @@ module.exports = {
   aggregateByTime,
   aggregateByCustomer,
   pickGranularity,
+  GRANULARITY,
+  fillEmptyBuckets,
+  round2,
 };
