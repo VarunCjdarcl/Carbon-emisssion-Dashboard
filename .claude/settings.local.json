@@ -5,7 +5,7 @@
       "Bash(cp .env.example .env)",
       "Bash(node backend/server.js)",
       "Bash(echo \"Started PID $!\")",
-      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s http://localhost:4101/api/health)",
       "Bash(taskkill /F /PID 12108)",
       "Bash(curl -s http://localhost:4100/api/health)",
       "Bash(curl -s \"http://localhost:4100/api/emissions/time?preset=thisMonth\")",

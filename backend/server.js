@@ -10,7 +10,7 @@ const reportsRouter = require('./routes/reports');
 const certificateRouter = require('./routes/certificate');
 
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 4101);
 
 app.use(compression());
 app.use(cors());
