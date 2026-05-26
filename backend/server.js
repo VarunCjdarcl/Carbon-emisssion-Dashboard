@@ -1,4 +1,7 @@
-require('dotenv').config();
+// require('dotenv').config();
+require('dotenv').config({
+  path: require('path').resolve("../.env")
+});
 const path = require('path');
 const express = require('express');
 const compression = require('compression');
@@ -12,8 +15,14 @@ const certificateRouter = require('./routes/certificate');
 const app = express();
 const PORT = Number(process.env.PORT || 4101);
 
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').trim();
+const IS_PROD = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+
+app.set('trust proxy', 1);
 app.use(compression());
-app.use(cors());
+app.use(cors(PUBLIC_BASE_URL && IS_PROD
+  ? { origin: PUBLIC_BASE_URL, credentials: false }
+  : {}));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 
@@ -25,6 +34,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     demo: (process.env.DEMO_MODE || 'true').toLowerCase() === 'true',
+    baseUrl: PUBLIC_BASE_URL || null,
     time: new Date().toISOString(),
   });
 });
@@ -58,7 +68,8 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 app.listen(PORT, () => {
-  console.log(`Carbon Emission Dashboard listening on http://localhost:${PORT}`);
+  const shown = PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  console.log(`Carbon Emission Dashboard listening on ${shown} (bind 0.0.0.0:${PORT})`);
   console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
   // Start the ETL worker.  In live mode this kicks off either an initial
   // backfill (empty DB) or an incremental catch-up (existing DB), and then
