@@ -7,9 +7,9 @@ backend/data/*.sqlite-shm
 backend/data/*.sqlite-wal
 
 # Environment files
-.env
-.env.local
-.env.*.local
+# .env
+# .env.local
+# .env.*.local
 
 # Logs
 *.log
