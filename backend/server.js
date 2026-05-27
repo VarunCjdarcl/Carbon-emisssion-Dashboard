@@ -7,6 +7,8 @@ const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
 const morgan = require('morgan');
+const https = require('https');
+const fs = require('fs');
 
 const emissionsRouter = require('./routes/emissions');
 const reportsRouter = require('./routes/reports');
@@ -67,7 +69,14 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   res.status(500).json({ error: err.message || 'Server error' });
 });
 
-app.listen(PORT, () => {
+const sslOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'ssl/private.key')),
+  cert: fs.readFileSync(path.join(__dirname, 'ssl/98c0c749062fefab.pem')),
+  ca: fs.readFileSync(path.join(__dirname, 'ssl/gd_bundle-g2.crt')),
+};
+
+// app.listen(PORT, () => {
+  https.createServer(sslOptions, app).listen(PORT, () => {
   const shown = PUBLIC_BASE_URL || `http://localhost:${PORT}`;
   console.log(`Carbon Emission Dashboard listening on ${shown} (bind 0.0.0.0:${PORT})`);
   console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
