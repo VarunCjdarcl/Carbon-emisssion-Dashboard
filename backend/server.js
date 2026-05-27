@@ -77,7 +77,7 @@ const sslOptions = {
 
 // app.listen(PORT, () => {
   https.createServer(sslOptions, app).listen(PORT, () => {
-  const shown = PUBLIC_BASE_URL || `http://localhost:${PORT}`; //+':' + PORT
+  const shown = PUBLIC_BASE_URL+':' + PORT || `http://localhost:${PORT}`;
   console.log(`Carbon Emission Dashboard listening on ${shown} (bind 0.0.0.0:${PORT})`);
   console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
   // Start the ETL worker.  In live mode this kicks off either an initial
