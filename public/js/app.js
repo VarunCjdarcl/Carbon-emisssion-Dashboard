@@ -3,26 +3,46 @@
 (function () {
   const state = { view: 'time' };
 
-  Period.init({ onApply: refresh });
-  CustomerFilter.init({ onChange: refresh });
-  Drilldown.attach();
-  EmailModal.attach();
+  // ---- Request supervisor state ----
+  // Declared up here (not after the function defs) so the initial refresh()
+  // call during bootstrap doesn't hit the Temporal Dead Zone on these `let`s.
+  // Only one refresh() runs at a time; a new one aborts the previous.
+  // The loader is deferred 200ms so cached/instant responses don't flicker.
+  let activeController = null;
+  let loaderTimer = null;
 
-  document.getElementById('viewSelect').addEventListener('change', e => {
-    state.view = e.target.value;
-    syncViewVisibility();
-    refresh();
+  // Each init/attach is isolated: a failure in a peripheral module (modals,
+  // customer list) must never stop the dashboard from loading its data on open.
+  safe('Period.init',        () => Period.init({ onApply: refresh }));
+  safe('CustomerFilter.init',() => CustomerFilter.init({ onChange: refresh }));
+  safe('Drilldown.attach',   () => Drilldown.attach());
+  safe('EmailModal.attach',  () => EmailModal.attach());
+
+  safe('viewSelect', () => {
+    document.getElementById('viewSelect').addEventListener('change', e => {
+      state.view = e.target.value;
+      syncViewVisibility();
+      refresh();
+    });
   });
 
   // Bootstrap: detect demo mode pill
   fetch('/api/health').then(r => r.json()).then(h => {
     const pill = document.getElementById('envPill');
+    if (!pill) return;
     if (h.demo) { pill.textContent = 'demo mode'; pill.classList.add('demo'); }
     else        { pill.textContent = 'live TMS'; pill.classList.remove('demo'); }
   }).catch(() => {});
 
-  syncViewVisibility();
+  safe('syncViewVisibility', syncViewVisibility);
+
+  // Always load data on open — this is the default 1-week view the user sees.
   refresh();
+
+  function safe(label, fn) {
+    try { fn(); }
+    catch (err) { console.error(`[init] ${label} failed:`, err); }
+  }
 
   function syncViewVisibility() {
     const isCustomer = state.view === 'customer';
@@ -32,11 +52,6 @@
   }
 
   // ---- Request supervisor ----
-  // Only one refresh() can be in-flight at a time. New refresh aborts old.
-  // The loader is deferred 200ms so cached/instant responses don't flicker.
-  let activeController = null;
-  let loaderTimer = null;
-
   async function refresh() {
     if (activeController) activeController.abort();
     const controller = new AbortController();

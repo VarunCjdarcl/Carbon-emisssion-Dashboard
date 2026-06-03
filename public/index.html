@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="/css/style.css?v=4" />
+  <link rel="stylesheet" href="/css/style.css?v=7" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -20,10 +20,6 @@
       <h1>Carbon Emission Dashboard</h1>
       <p class="brand-sub">Logistics Sustainability · TMS Shipment Module</p>
     </div>
-  </div>
-  <div class="topbar-meta">
-    <span class="env-pill" id="envPill">demo mode</span>
-    <span class="last-updated">Last updated: <strong id="lastUpdated">—</strong></span>
   </div>
 </header>
 
@@ -45,10 +41,10 @@
         <label>Period</label>
         <button class="period-btn" id="periodBtn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span id="periodLabel">This Month</span>
+          <span id="periodLabel">Last 7 Days</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <span class="active-pill" id="activePill">This Month</span>
+        <span class="active-pill" id="activePill">Last 7 Days</span>
       </div>
 
       <div class="control control-customer" id="customerControl" hidden>
@@ -116,7 +112,7 @@
       </div>
       <div class="total-emission-value">
         <strong id="totalEmissionValue">0</strong>
-        <span>kg CO₂</span>
+        <span>kg CO₂e</span>
       </div>
     </footer>
   </section>
@@ -129,8 +125,8 @@
         <p class="card-sub" id="customerSubtitle">All customers · This Month</p>
       </div>
       <div class="customer-stats">
-        <span class="stat-pill stat-blue">Total: <strong id="custTotal">0</strong> kg CO₂</span>
-        <span class="stat-pill">Avg: <strong id="custAvg">0</strong> kg CO₂</span>
+        <span class="stat-pill stat-blue">Total: <strong id="custTotal">0</strong> kg CO₂e</span>
+        <span class="stat-pill">Avg: <strong id="custAvg">0</strong> kg CO₂e</span>
         <span class="stat-pill">Top: <strong id="custTop">—</strong></span>
       </div>
     </header>
@@ -187,13 +183,15 @@
       <button class="btn btn-icon" data-close aria-label="Close">×</button>
     </header>
     <form id="emailForm" class="email-form">
-      <label class="email-label">To: <input type="email" name="to" required></label>
-      <label class="email-label">Cc: <input type="text" name="cc" placeholder="comma separated"></label>
-      <label class="email-label">Subject: <input type="text" name="subject" required></label>
-      <label class="email-label email-label-textarea">Message:
-        <textarea name="body" rows="8" required></textarea>
-      </label>
-      <div class="email-attachment" id="emailAttachment"></div>
+      <div class="email-body">
+        <label class="email-label">To: <input type="email" name="to" required></label>
+        <label class="email-label">Cc: <input type="text" name="cc" placeholder="comma separated"></label>
+        <label class="email-label">Subject: <input type="text" name="subject" required></label>
+        <label class="email-label email-label-textarea">Message:
+          <textarea name="body" rows="8" required></textarea>
+        </label>
+        <div class="email-attachment" id="emailAttachment"></div>
+      </div>
       <footer class="modal-footer">
         <span class="email-status" id="emailStatus"></span>
         <div>
@@ -207,13 +205,13 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="/js/util.js?v=2"></script>
-<script src="/js/period.js"></script>
-<script src="/js/customerFilter.js"></script>
-<script src="/js/timeView.js?v=5"></script>
-<script src="/js/customerView.js?v=6"></script>
-<script src="/js/drilldown.js"></script>
-<script src="/js/email.js?v=2"></script>
-<script src="/js/app.js?v=4"></script>
+<script src="/js/util.js?v=8"></script>
+<script src="/js/period.js?v=8"></script>
+<script src="/js/customerFilter.js?v=8"></script>
+<script src="/js/timeView.js?v=8"></script>
+<script src="/js/customerView.js?v=9"></script>
+<script src="/js/drilldown.js?v=9"></script>
+<script src="/js/email.js?v=7"></script>
+<script src="/js/app.js?v=8"></script>
 </body>
 </html>

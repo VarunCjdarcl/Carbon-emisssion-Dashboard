@@ -40,31 +40,39 @@ router.get('/customers', async (req, res, next) => {
   }
 });
 
-// GET /api/customers — full list for the searchable dropdown
+// GET /api/customers — full list for the searchable dropdown.
+// Source it from the DB (same data the customer chart aggregates) so the
+// dropdown lists every customer that actually has shipments — otherwise, in
+// demo/ETL-off mode store.listCustomers() returns only a tiny curated list and
+// searching for a real customer from the chart finds nothing.
 router.get('/customer-list', async (req, res, next) => {
   try {
-    const list = store.listCustomers();
+    const dbRows = db.listAllCustomers();
+    const list = (dbRows && dbRows.length)
+      ? dbRows.map(r => ({ code: r.code, name: r.name, email: r.email }))
+      : store.listCustomers();
     res.json({ customers: list });
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/emissions/customer/:code/shipments?preset=&from=&till=
-router.get('/customer/:code/shipments', async (req, res, next) => {
+// GET /api/emissions/customer-shipments?customer=<name>&preset=&from=&till=
+// `customer` is the company NAME (the dashboard-wide identifier). Passed as a
+// query param so names with dots/slashes/spaces don't break path routing.
+router.get('/customer-shipments', async (req, res, next) => {
   try {
-    const { code } = req.params;
-    const { preset = 'thisMonth', from, till } = req.query;
+    const { customer, preset = 'thisMonth', from, till } = req.query;
+    if (!customer) return res.status(400).json({ error: 'customer required' });
     const range = resolvePreset(preset, { from, till });
-    // Indexed query on (customer_code, completion_time) — no full-table scan.
-    const filtered = db.getShipmentsByCustomerInRange(code, range.from, range.till);
+    const filtered = db.getShipmentsByCustomerInRange(customer, range.from, range.till);
 
     res.json({
       preset,
       presetLabel: presetLabel(preset),
       range,
-      customerCode: code,
-      customerName: filtered[0]?.customerName || code,
+      customerCode: customer,
+      customerName: filtered[0]?.customerName || customer,
       customerEmail: filtered[0]?.customerEmail || '',
       shipments: filtered,
       totals: summariseShipments(filtered),

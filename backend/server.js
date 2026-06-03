@@ -1,6 +1,5 @@
-// require('dotenv').config();
 require('dotenv').config({
-  path: require('path').resolve("../.env")
+  path: require('path').resolve(__dirname, '..', '.env'),
 });
 const path = require('path');
 const express = require('express');
@@ -62,22 +61,46 @@ app.get('/api/etl/status', (req, res) => {
 });
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-app.use(express.static(PUBLIC_DIR, { maxAge: '1h', index: 'index.html' }));
+app.use(express.static(PUBLIC_DIR, {
+  maxAge: '1h',
+  index: 'index.html',
+  setHeaders: (res, filePath) => {
+    // Never cache the HTML shell — it carries the versioned script URLs
+    // (?v=N). If the browser cached index.html, it would keep loading stale
+    // JS and the dashboard could open on an outdated default / empty state.
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   console.error('[error]', err);
   res.status(500).json({ error: err.message || 'Server error' });
 });
 
-const sslOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'ssl/private.key')),
-  cert: fs.readFileSync(path.join(__dirname, 'ssl/98c0c749062fefab.pem')),
-  ca: fs.readFileSync(path.join(__dirname, 'ssl/gd_bundle-g2.crt')),
+const sslDir = path.join(__dirname, 'ssl');
+const sslKeyPath = path.join(sslDir, 'private.key');
+const sslCertPath = path.join(sslDir, '98c0c749062fefab.pem');
+const sslCaPath = path.join(sslDir, 'gd_bundle-g2.crt');
+const hasSsl = fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath) && fs.existsSync(sslCaPath);
+
+const startServer = (cb) => {
+  if (hasSsl) {
+    const sslOptions = {
+      key: fs.readFileSync(sslKeyPath),
+      cert: fs.readFileSync(sslCertPath),
+      ca: fs.readFileSync(sslCaPath),
+    };
+    return https.createServer(sslOptions, app).listen(PORT, cb);
+  }
+  console.warn('[ssl] cert files not found in backend/ssl — starting over plain HTTP (local/dev mode)');
+  return app.listen(PORT, cb);
 };
 
-// app.listen(PORT, () => {
-  https.createServer(sslOptions, app).listen(PORT, () => {
-  const shown = PUBLIC_BASE_URL + ':' + PORT || `http://localhost:${PORT}`;
+startServer(() => {
+  const proto = hasSsl ? 'https' : 'http';
+  const shown = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL}:${PORT}` : `${proto}://localhost:${PORT}`;
   console.log(`Carbon Emission Dashboard listening on ${shown} (bind 0.0.0.0:${PORT})`);
   console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
   // Start the ETL worker.  In live mode this kicks off either an initial

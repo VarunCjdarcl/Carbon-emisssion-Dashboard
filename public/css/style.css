@@ -25,6 +25,7 @@
   --sky-600: #0284c7;
   --sky-500: #0ea5e9;
   --sky-50:  #e0f2fe;
+  --sky-100: #bae6fd;
 
   /* Neutrals — slate-tinted for a cleaner, more contemporary feel */
   --bg-page-from: #f4f7fc;
@@ -159,7 +160,7 @@ a:hover { text-decoration: underline; }
 /* ============== Toolbar ============== */
 .toolbar { margin-bottom: 22px; position: relative; z-index: 10; }
 .toolbar-row {
-  display: flex; align-items: flex-end; gap: 22px;
+  display: flex; align-items: flex-start; gap: 22px;
   background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 18px 22px; box-shadow: var(--shadow-sm);
@@ -270,10 +271,12 @@ a:hover { text-decoration: underline; }
 }
 .cal-cell {
   padding: 9px 0; text-align: center; border-radius: 8px; cursor: pointer; font-size: 13px;
-  color: var(--text-primary); background: #fff; transition: background-color 120ms var(--ease);
+  color: var(--text-primary); background: #fff;
+  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+  user-select: none;
 }
 .cal-cell.muted { color: var(--text-muted); }
-.cal-cell:hover { background: var(--sky-50); }
+.cal-cell:hover { background: var(--sky-100); }
 .cal-cell.in-range { background: var(--sky-50); color: var(--sky-600); }
 .cal-cell.range-end {
   background: linear-gradient(135deg, var(--sky-500), var(--sky-600));
@@ -326,6 +329,10 @@ a:hover { text-decoration: underline; }
   transition: background-color 120ms var(--ease);
 }
 .customer-item:last-child { border-bottom: none; }
+.customer-item-more {
+  padding: 10px 16px; font-size: 12px; color: var(--text-muted);
+  text-align: center; font-style: italic; background: #fafbfe;
+}
 .customer-item:hover { background: #f5f8fd; }
 .customer-item.selected { background: linear-gradient(90deg, var(--sky-50), transparent); }
 .customer-item.selected .ci-name { color: var(--sky-600); }
@@ -599,7 +606,8 @@ a:hover { text-decoration: underline; }
 .pager button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Email modal */
-.email-form { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.email-form { display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: hidden; }
+.email-body { padding: 22px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; flex: 1; min-height: 0; }
 .email-label {
   display: flex; flex-direction: column; gap: 5px;
   font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
@@ -610,7 +618,7 @@ a:hover { text-decoration: underline; }
   text-transform: none; letter-spacing: 0; font-weight: 400;
   box-shadow: var(--shadow-xs);
 }
-.email-label-textarea textarea { resize: vertical; min-height: 160px; font-family: inherit; line-height: 1.5; }
+.email-label-textarea textarea { resize: vertical; min-height: 120px; font-family: inherit; line-height: 1.5; }
 .email-attachment {
   font-size: 12px; color: var(--text-secondary);
   background: linear-gradient(135deg, var(--sky-50), #eaf3fe);

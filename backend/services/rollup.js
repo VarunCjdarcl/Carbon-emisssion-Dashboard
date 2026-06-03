@@ -145,7 +145,7 @@ SELECT day_ist,
        SUM(shipment_count) AS cnt
 FROM shipment_rollup_daily
 WHERE day_ist BETWEEN ? AND ?
-  AND customer_code = ?
+  AND COALESCE(customer_name, customer_code) = ?
 GROUP BY day_ist
 ORDER BY day_ist
 `);
@@ -157,16 +157,18 @@ function dailySeries(fromMs, tillMs, customerCode) {
   return dailySeriesStmt.all(fromDay, tillDay);
 }
 
+// One row per company NAME (codes merged), so the chart shows each company
+// once. `code` is set to the name to stay the dashboard-wide identifier.
 const customerTotalsStmt = db.db.prepare(`
-SELECT customer_code      AS code,
-       MAX(customer_name)  AS name,
+SELECT COALESCE(customer_name, customer_code) AS code,
+       COALESCE(customer_name, customer_code) AS name,
        MAX(customer_email) AS email,
        SUM(road_emission)  AS road,
        SUM(rail_aversion)  AS rail,
        SUM(shipment_count) AS cnt
 FROM shipment_rollup_daily
 WHERE day_ist BETWEEN ? AND ?
-GROUP BY customer_code
+GROUP BY COALESCE(customer_name, customer_code)
 ORDER BY road DESC
 `);
 

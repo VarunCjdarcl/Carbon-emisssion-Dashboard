@@ -31,7 +31,8 @@ const TimeView = (() => {
     document.getElementById('chartSubtitle').textContent = fallback
       ? `Live shipments · ${data.presetLabel} · emission fields not yet populated`
       : `Grouped by ${data.granularity} · ${data.presetLabel}`;
-    document.getElementById('lastUpdated').textContent =
+    const lu = document.getElementById('lastUpdated');
+    if (lu) lu.textContent =
       new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   }
 
@@ -43,13 +44,13 @@ const TimeView = (() => {
     grid.innerHTML = `
       <div class="kpi-tile blue">
         <div class="kpi-label">Total Road Emissions</div>
-        <div class="kpi-value">${Util.fmtNum(road.value, road.unit === 'tonnes CO₂' ? 2 : 0)}</div>
+        <div class="kpi-value">${Util.fmtNum(road.value, 0)}</div>
         <div class="kpi-unit">${road.unit}</div>
         <div class="kpi-delta neutral">${presetLabel}</div>
       </div>
       <div class="kpi-tile green">
         <div class="kpi-label">Rail Aversion</div>
-        <div class="kpi-value">${Util.fmtNum(rail.value, rail.unit === 'tonnes CO₂' ? 2 : 0)}</div>
+        <div class="kpi-value">${Util.fmtNum(rail.value, 0)}</div>
         <div class="kpi-unit">${rail.unit}</div>
         <div class="kpi-delta neutral">${presetLabel}</div>
       </div>
@@ -98,7 +99,7 @@ const TimeView = (() => {
         ];
 
     // Show / hide the legend dots and update axis title to match
-    const yLabel = fallbackToCount ? '# shipments' : 'kg CO₂';
+    const yLabel = fallbackToCount ? '# shipments' : 'kg CO₂e';
     document.querySelector('.legend').style.display = fallbackToCount ? 'none' : 'flex';
     document.getElementById('chartSubtitle').dataset.fallback = String(fallbackToCount);
 
@@ -118,8 +119,8 @@ const TimeView = (() => {
               label: (ctx) => {
                 const idx = ctx.dataIndex;
                 if (fallbackToCount) return `  Shipments        ${Util.fmtNum(counts[idx], 0)}`;
-                if (ctx.datasetIndex === 0) return `  Road emissions   ${Util.fmtNum(road[idx], 0)} kg CO₂`;
-                if (ctx.datasetIndex === 1) return `  Rail aversion  ${Util.fmtNum(rail[idx], 0)} kg CO₂`;
+                if (ctx.datasetIndex === 0) return `  Road emissions   ${Util.fmtNum(road[idx], 0)} kg CO₂e`;
+                if (ctx.datasetIndex === 1) return `  Rail aversion  ${Util.fmtNum(rail[idx], 0)} kg CO₂e`;
                 return '';
               },
               afterBody: (items) => fallbackToCount ? '' : `  Shipments        ${Util.fmtNum(counts[items[0].dataIndex], 0)}`,
@@ -140,7 +141,7 @@ const TimeView = (() => {
 
   function renderTotalEmission({ totals, presetLabel }) {
     const compact = Util.compactCO2(totals.totalRoadEmissions);
-    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(compact.value, compact.unit === 'tonnes CO₂' ? 2 : 0);
+    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(compact.value, 0);
     document.querySelector('#totalEmissionPanel span').textContent = compact.unit;
     document.getElementById('totalEmissionSub').textContent =
       `Sum of all road shipments · ${presetLabel}`;

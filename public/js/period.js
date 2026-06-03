@@ -17,11 +17,14 @@ const Period = (() => {
   ];
 
   const state = {
-    preset: 'thisMonth',
+    preset: 'last7',
     from: null,
     till: null,
+    hoverTs: null,         // day under the cursor while picking the 2nd endpoint
     visMonth: new Date(),  // calendar visible month
   };
+
+  let calCells = [];       // live references to the 42 day cells for in-place repaint
 
   let onApplyCb = () => {};
 
@@ -53,8 +56,8 @@ const Period = (() => {
       dd.hidden = true;
     });
 
-    // Default: This Month
-    selectPreset('thisMonth', { silent: true });
+    // Default: Last 7 Days (always shows a full week of recent data on open)
+    selectPreset('last7', { silent: true });
     syncButtons();
   }
 
@@ -134,6 +137,7 @@ const Period = (() => {
     const grid = document.getElementById('calGrid');
     const title = document.getElementById('calTitle');
     grid.innerHTML = '';
+    calCells = [];
     const v = state.visMonth;
     title.textContent = v.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     const first = new Date(v.getFullYear(), v.getMonth(), 1);
@@ -146,36 +150,67 @@ const Period = (() => {
       cell.className = 'cal-cell';
       if (d.getMonth() !== v.getMonth()) cell.classList.add('muted');
       cell.textContent = d.getDate();
-      const dayMs = d.setHours(0,0,0,0);
-      if (state.from && state.till) {
-        const fromMs = new Date(state.from).setHours(0,0,0,0);
-        const tillMs = new Date(state.till).setHours(0,0,0,0);
-        if (dayMs >= fromMs && dayMs <= tillMs) cell.classList.add('in-range');
-        if (dayMs === fromMs || dayMs === tillMs) cell.classList.add('range-end');
-      }
-      cell.addEventListener('click', () => onCalendarClick(d));
+      const dayMs = new Date(d).setHours(0, 0, 0, 0);
+      cell._ts = dayMs;
+      cell.addEventListener('click', () => onCalendarClick(dayMs));
+      // Live range preview: while the start is picked but the end isn't,
+      // hovering a day highlights the tentative range up to the cursor.
+      cell.addEventListener('mouseenter', () => {
+        if (state.from != null && state.till == null) { state.hoverTs = dayMs; paintRange(); }
+      });
+      calCells.push(cell);
       grid.appendChild(cell);
+    }
+    // Drop the preview once the cursor leaves the grid.
+    grid.onmouseleave = () => {
+      if (state.hoverTs != null) { state.hoverTs = null; paintRange(); }
+    };
+    paintRange();
+  }
+
+  // Repaint range highlight on the existing cells — no DOM rebuild, so the
+  // selection tracks the cursor smoothly instead of flickering each click.
+  function paintRange() {
+    const fromMs = state.from != null ? new Date(state.from).setHours(0, 0, 0, 0) : null;
+    // Span end = the committed `till`, else the hovered day (live preview).
+    const endMs = state.till != null
+      ? new Date(state.till).setHours(0, 0, 0, 0)
+      : (state.from != null ? state.hoverTs : null);
+
+    let lo = fromMs, hi = endMs;
+    if (lo != null && hi != null && hi < lo) { const t = lo; lo = hi; hi = t; }
+
+    for (const cell of calCells) {
+      const ts = cell._ts;
+      const isEnd = (fromMs != null && ts === fromMs) || (endMs != null && ts === endMs);
+      const inRange = lo != null && hi != null && ts >= lo && ts <= hi && !isEnd;
+      cell.classList.toggle('range-end', isEnd);
+      cell.classList.toggle('in-range', inRange);
     }
   }
 
-  function onCalendarClick(d) {
+  function onCalendarClick(dayMs) {
     state.preset = 'custom';
     document.querySelectorAll('.preset').forEach(p => {
       p.classList.toggle('active', p.dataset.id === 'custom');
     });
-    if (!state.from || (state.from && state.till)) {
-      state.from = new Date(d).setHours(0,0,0,0);
+    const fromMs = state.from != null ? new Date(state.from).setHours(0, 0, 0, 0) : null;
+    if (state.from == null || state.till != null) {
+      // Start a fresh range.
+      state.from = dayMs;
       state.till = null;
-    } else if (d.getTime() < state.from) {
-      state.till = state.from;
-      state.from = new Date(d).setHours(0,0,0,0);
+    } else if (dayMs < fromMs) {
+      // Clicked before the start — flip them so the range stays valid.
+      state.till = new Date(state.from).setHours(23, 59, 59, 999);
+      state.from = dayMs;
     } else {
-      state.till = new Date(d).setHours(23,59,59,999);
+      state.till = new Date(dayMs).setHours(23, 59, 59, 999);
     }
+    state.hoverTs = null;
     document.getElementById('groupedBy').textContent = 'auto';
     document.getElementById('fromField').value = state.from ? Util.fmtDateInput(state.from) : '';
     document.getElementById('toField').value = state.till ? Util.fmtDateInput(state.till) : '';
-    renderCalendar();
+    paintRange();
   }
 
   function applyAndClose() {

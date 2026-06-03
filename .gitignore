@@ -6,10 +6,16 @@ backend/data/*.sqlite
 backend/data/*.sqlite-shm
 backend/data/*.sqlite-wal
 
-# Environment files
-# .env
-# .env.local
-# .env.*.local
+# Environment files (contain secrets — never commit)
+.env
+.env.local
+.env.*.local
+
+# SSL certificates (uploaded to the deploy server out-of-band)
+backend/ssl/
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # Logs
 *.log

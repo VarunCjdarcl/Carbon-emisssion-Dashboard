@@ -56,10 +56,9 @@ const Util = (() => {
     }[c]));
   }
 
-  // Convert kg to either kg or tonnes for compact KPI display
+  // Emission values are always shown in kilograms of CO₂-equivalent.
   function compactCO2(kg) {
-    if (kg >= 1000) return { value: kg / 1000, unit: 'tonnes CO₂' };
-    return { value: kg, unit: 'kg CO₂' };
+    return { value: kg, unit: 'kg CO₂e' };
   }
 
   return { fmtNum, fmtDate, fmtDateInput, api, toast, debounce, escapeHtml, compactCO2, isAbortError };

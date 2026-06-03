@@ -5,14 +5,16 @@ const router = express.Router();
 const db = require('../services/db');
 const { resolvePreset, presetLabel } = require('../services/dateRange');
 
-// GET /api/reports/customer/:code.xlsx?preset=&from=&till=
-router.get('/customer/:code.xlsx', async (req, res, next) => {
+// GET /api/reports/customer.xlsx?customer=<name>&preset=&from=&till=
+// `customer` is the company NAME, passed as a query param (names can contain
+// dots/slashes that would break a path segment).
+router.get('/customer.xlsx', async (req, res, next) => {
   try {
-    const { code } = req.params;
-    const { preset = 'thisMonth', from, till } = req.query;
+    const { customer, preset = 'thisMonth', from, till } = req.query;
+    if (!customer) return res.status(400).json({ error: 'customer required' });
     const range = resolvePreset(preset, { from, till });
-    const filtered = db.getShipmentsByCustomerInRange(code, range.from, range.till);
-    const customerName = (filtered[0]?.customerName || code).replace(/[^a-zA-Z0-9]+/g, '_');
+    const filtered = db.getShipmentsByCustomerInRange(customer, range.from, range.till);
+    const customerName = (filtered[0]?.customerName || customer).replace(/[^a-zA-Z0-9]+/g, '_');
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'CJ Darcl Logistics';

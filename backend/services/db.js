@@ -183,19 +183,20 @@ function countShipmentsInRange(from, till) {
 
 // Indexed lookup for a single customer's shipments inside a range.  Used by
 // drill-down + excel export + certificate so we never load 600k rows just to
-// filter one customer out.
+// filter one customer out.  We key on customer NAME (not code) so all of a
+// company's codes are merged into one customer everywhere in the dashboard.
 const customerRangeStmt = db.prepare(`
 SELECT * FROM shipments
-WHERE customer_code = ?
+WHERE COALESCE(customer_name, customer_code) = ?
   AND COALESCE(completion_time, shipment_date) BETWEEN ? AND ?
 ORDER BY COALESCE(completion_time, shipment_date) DESC
 `);
-function getShipmentsByCustomerInRange(code, from, till) {
-  return customerRangeStmt.all(code, from, till).map(shipmentFromRow);
+function getShipmentsByCustomerInRange(name, from, till) {
+  return customerRangeStmt.all(name, from, till).map(shipmentFromRow);
 }
 
 // Per-customer totals straight from the raw shipments table.  Used by the
-// certificate endpoint which only needs sums + a name/email.
+// certificate endpoint which only needs sums + a name/email.  Keyed by name.
 const customerTotalsStmt = db.prepare(`
 SELECT MAX(customer_name)  AS customer_name,
        MAX(customer_email) AS customer_email,
@@ -204,13 +205,13 @@ SELECT MAX(customer_name)  AS customer_name,
        SUM(COALESCE(total_distance, 0))        AS distance,
        COUNT(*) AS cnt
 FROM shipments
-WHERE customer_code = ?
+WHERE COALESCE(customer_name, customer_code) = ?
   AND COALESCE(completion_time, shipment_date) BETWEEN ? AND ?
 `);
-function getCustomerTotals(code, from, till) {
-  const r = customerTotalsStmt.get(code, from, till) || {};
+function getCustomerTotals(name, from, till) {
+  const r = customerTotalsStmt.get(name, from, till) || {};
   return {
-    customerName: r.customer_name || code,
+    customerName: r.customer_name || name,
     customerEmail: r.customer_email || '',
     totalEmission: Number(r.road) || 0,
     totalAversionRail: Number(r.rail) || 0,
@@ -248,15 +249,17 @@ function getStats() {
   };
 }
 
-// Distinct customers for the searchable dropdown.
+// Distinct customers for the searchable dropdown — one row per company NAME
+// (a company can have many customer codes; we merge them). `code` is the name
+// so it doubles as the identifier the rest of the dashboard filters on.
 const distinctCustomersStmt = db.prepare(`
-SELECT customer_code AS code,
+SELECT COALESCE(customer_name, customer_code) AS code,
        COALESCE(customer_name, customer_code) AS name,
-       COALESCE(customer_email, '') AS email,
+       MAX(COALESCE(customer_email, '')) AS email,
        COUNT(*) AS shipments
 FROM shipments
-WHERE customer_code IS NOT NULL
-GROUP BY customer_code
+WHERE COALESCE(customer_name, customer_code) IS NOT NULL
+GROUP BY COALESCE(customer_name, customer_code)
 ORDER BY shipments DESC
 `);
 function listAllCustomers() {

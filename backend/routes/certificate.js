@@ -30,12 +30,13 @@ async function buildCertificatePayload({ code, preset, from, till }) {
   };
 }
 
-// GET /api/certificate/customer/:code.pdf?preset=&from=&till=
-router.get('/customer/:code.pdf', async (req, res, next) => {
+// GET /api/certificate/customer.pdf?customer=<name>&preset=&from=&till=
+// `customer` is the company NAME, passed as a query param.
+router.get('/customer.pdf', async (req, res, next) => {
   try {
-    const { code } = req.params;
-    const { preset = 'thisMonth', from, till } = req.query;
-    const payload = await buildCertificatePayload({ code, preset, from, till });
+    const { customer, preset = 'thisMonth', from, till } = req.query;
+    if (!customer) return res.status(400).json({ error: 'customer required' });
+    const payload = await buildCertificatePayload({ code: customer, preset, from, till });
     const filename = `${payload.customerName.replace(/[^a-zA-Z0-9]+/g, '_')}_Certificate_${payload.periodLabel.replace(/\s+/g, '')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);

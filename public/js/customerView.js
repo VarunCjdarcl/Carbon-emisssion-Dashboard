@@ -4,6 +4,12 @@ const CustomerView = (() => {
   let chart = null;
   let lastData = null;
 
+  // Plotting all ~800 customers turns the X-axis into an unreadable smear.
+  // The backend returns them sorted by emissions (highest first), so we chart
+  // only the biggest contributors. KPI tiles + Total/Avg/Top still reflect
+  // every customer — this cap is purely a chart-readability limit.
+  const TOP_N = 15;
+
   async function load(period, customerCode, { signal } = {}) {
     const params = new URLSearchParams();
     params.set('preset', period.preset || 'thisMonth');
@@ -22,15 +28,20 @@ const CustomerView = (() => {
     if (signal?.aborted) return; // late return — supervisor moved on
     lastData = data;
 
+    const totalCust = data.customers.length;
+    const subtitleScope = customerCode
+      ? 'Selected customer'
+      : (totalCust > TOP_N ? `Top ${TOP_N} of ${totalCust} customers` : 'All customers');
     document.getElementById('customerSubtitle').textContent =
-      (customerCode ? `Selected customer · ${data.presetLabel}` : `All customers · ${data.presetLabel}`);
+      `${subtitleScope} · ${data.presetLabel}`;
     document.getElementById('custTotal').textContent = Util.fmtNum(data.totals.total, 0);
     document.getElementById('custAvg').textContent = Util.fmtNum(data.totals.avg, 0);
     document.getElementById('custTop').textContent = data.totals.top || '—';
 
     renderKpis(data);
     renderChart(data, customerCode);
-    document.getElementById('lastUpdated').textContent =
+    const lu = document.getElementById('lastUpdated');
+    if (lu) lu.textContent =
       new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   }
 
@@ -42,7 +53,7 @@ const CustomerView = (() => {
     grid.innerHTML = `
       <div class="kpi-tile orange">
         <div class="kpi-label">Total Emissions</div>
-        <div class="kpi-value">${Util.fmtNum(teCompact.value, teCompact.unit === 'tonnes CO₂' ? 2 : 0)}</div>
+        <div class="kpi-value">${Util.fmtNum(teCompact.value, 0)}</div>
         <div class="kpi-unit">${teCompact.unit}</div>
         <div class="kpi-delta neutral">${presetLabel}</div>
       </div>
@@ -63,21 +74,25 @@ const CustomerView = (() => {
     const canvas = document.getElementById('customerChart');
     const ctx = canvas.getContext('2d');
 
+    // Only chart the biggest contributors — see TOP_N note above. `customers`
+    // is already sorted by emissions desc, so a slice gives the top N.
+    const shown = customers.slice(0, TOP_N);
+
     // Wrap long customer names onto two lines so the X-axis stays readable
     // even when there are 12+ bars in view.
-    const labels = customers.map(c => wrapLabel(c.customerName, 14));
+    const labels = shown.map(c => wrapLabel(c.customerName, 14));
 
     // Live mode fallback: when emission fields are missing from the source
     // data (TMS list endpoint currently returns Planned shipments only,
     // which lack carbonEmissionValue), plot shipment counts so the chart
     // isn't visually empty.
-    const totalEmissions = customers.reduce((a, c) => a + c.totalEmissions, 0);
+    const totalEmissions = shown.reduce((a, c) => a + c.totalEmissions, 0);
     const fallbackToCount = totalEmissions === 0
-                         && customers.some(c => c.totalShipments > 0);
-    const data = customers.map(c => fallbackToCount ? c.totalShipments : c.totalEmissions);
-    const backgrounds = customers.map(c => c.customerCode === customerCode ? '#1a2b5f' : '#f97316');
+                         && shown.some(c => c.totalShipments > 0);
+    const data = shown.map(c => fallbackToCount ? c.totalShipments : c.totalEmissions);
+    const backgrounds = shown.map(c => c.customerCode === customerCode ? '#1a2b5f' : '#f97316');
 
-    const datasetLabel = fallbackToCount ? 'Shipments' : 'Carbon emission (kg CO₂)';
+    const datasetLabel = fallbackToCount ? 'Shipments' : 'Carbon emission (kg CO₂e)';
     const config = {
       type: 'bar',
       data: {
@@ -94,7 +109,7 @@ const CustomerView = (() => {
         onClick: (evt, elements) => {
           if (!elements.length) return;
           const idx = elements[0].index;
-          const cust = customers[idx];
+          const cust = shown[idx];
           if (cust) Drilldown.open(cust);
         },
         onHover: (evt, els) => { canvas.style.cursor = els.length ? 'pointer' : 'default'; },
@@ -103,9 +118,9 @@ const CustomerView = (() => {
           tooltip: {
             backgroundColor: '#111e45', padding: 12, cornerRadius: 8,
             callbacks: {
-              title: (items) => customers[items[0].dataIndex].customerName,
+              title: (items) => shown[items[0].dataIndex].customerName,
               label: (ctx) => {
-                const c = customers[ctx.dataIndex];
+                const c = shown[ctx.dataIndex];
                 if (fallbackToCount) {
                   return [
                     `  Shipments        ${Util.fmtNum(c.totalShipments, 0)}`,
@@ -113,9 +128,9 @@ const CustomerView = (() => {
                   ];
                 }
                 return [
-                  `  Total emissions  ${Util.fmtNum(c.totalEmissions, 0)} kg CO₂`,
+                  `  Total emissions  ${Util.fmtNum(c.totalEmissions, 0)} kg CO₂e`,
                   `  Total shipments  ${Util.fmtNum(c.totalShipments, 0)}`,
-                  `  Rail aversion    ${Util.fmtNum(c.totalRail, 0)} kg CO₂`,
+                  `  Rail aversion    ${Util.fmtNum(c.totalRail, 0)} kg CO₂e`,
                 ];
               },
             },

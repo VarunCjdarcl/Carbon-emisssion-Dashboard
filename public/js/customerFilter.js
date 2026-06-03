@@ -45,9 +45,17 @@ const CustomerFilter = (() => {
       .concat(state.customers.map(c => ({
         code: c.code, name: c.name, sub: c.code,
       })));
-    const filt = q
-      ? items.filter(c => c.name.toLowerCase().includes(q.toLowerCase()))
+    const needle = (q || '').trim().toLowerCase();
+    const matches = needle
+      ? items.filter(c =>
+          String(c.name || '').toLowerCase().includes(needle) ||
+          String(c.sub || '').toLowerCase().includes(needle))
       : items;
+    // The list can hold thousands of customers; only build a capped number of
+    // DOM rows so the dropdown stays responsive. Search still matches across
+    // the full list — you just narrow it by typing.
+    const MAX_ROWS = 50;
+    const filt = matches.slice(0, MAX_ROWS);
     for (const c of filt) {
       const row = document.createElement('div');
       row.className = 'customer-item' + (c.code === state.selected ? ' selected' : '');
@@ -65,6 +73,17 @@ const CustomerFilter = (() => {
         onChangeCb(getCurrent());
       });
       list.appendChild(row);
+    }
+    if (matches.length > filt.length) {
+      const more = document.createElement('div');
+      more.className = 'customer-item-more';
+      more.textContent = `+${matches.length - filt.length} more — type to narrow your search`;
+      list.appendChild(more);
+    } else if (matches.length === 0) {
+      const none = document.createElement('div');
+      none.className = 'customer-item-more';
+      none.textContent = 'No customers match your search';
+      list.appendChild(none);
     }
   }
 

@@ -61,13 +61,14 @@ const Drilldown = (() => {
     document.querySelector('#drillTable tbody').innerHTML = '';
 
     const params = new URLSearchParams();
+    params.set('customer', customer.customerCode);
     params.set('preset', period.preset || 'thisMonth');
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
     let data;
     try {
-      data = await Util.api(`/api/emissions/customer/${encodeURIComponent(customer.customerCode)}/shipments?` + params.toString());
+      data = await Util.api('/api/emissions/customer-shipments?' + params.toString());
     } catch (e) {
       Util.toast(e.message, 'error');
       return;
@@ -85,8 +86,8 @@ const Drilldown = (() => {
     const t = data.totals;
     el.innerHTML = `
       <span class="stat-pill"><strong>${Util.fmtNum(t.totalShipments, 0)}</strong> shipments</span>
-      <span class="stat-pill stat-blue">Road emissions <strong>${Util.fmtNum(t.totalEmission, 0)}</strong> kg CO₂</span>
-      <span class="stat-pill">Rail aversion <strong>${Util.fmtNum(t.totalAversionRail, 0)}</strong> kg CO₂</span>
+      <span class="stat-pill stat-blue">Road emissions <strong>${Util.fmtNum(t.totalEmission, 0)}</strong> kg CO₂e</span>
+      <span class="stat-pill">Rail aversion <strong>${Util.fmtNum(t.totalAversionRail, 0)}</strong> kg CO₂e</span>
       <span class="stat-pill">Distance <strong>${Util.fmtNum(t.totalDistance, 0)}</strong> km</span>
       <span class="stat-pill">${data.presetLabel}</span>
     `;
@@ -163,11 +164,12 @@ const Drilldown = (() => {
     if (!state.customer) return;
     const period = state.period || Period.getCurrent();
     const params = new URLSearchParams();
+    params.set('customer', state.customer.customerCode);
     params.set('preset', period.preset || 'thisMonth');
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
-    const url = `/api/reports/customer/${encodeURIComponent(state.customer.customerCode)}.xlsx?` + params.toString();
+    const url = '/api/reports/customer.xlsx?' + params.toString();
     window.location.href = url;
   }
 
