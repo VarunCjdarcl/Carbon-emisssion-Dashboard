@@ -11,33 +11,72 @@
   let activeController = null;
   let loaderTimer = null;
 
-  // Each init/attach is isolated: a failure in a peripheral module (modals,
-  // customer list) must never stop the dashboard from loading its data on open.
-  safe('Period.init',        () => Period.init({ onApply: refresh }));
-  safe('CustomerFilter.init',() => CustomerFilter.init({ onChange: refresh }));
-  safe('Drilldown.attach',   () => Drilldown.attach());
-  safe('EmailModal.attach',  () => EmailModal.attach());
+  // Bootstrap runs after /api/health resolves so we can pick a default preset
+  // that actually contains data. When ETL is caught up, `last7` is used (fresh
+  // 7-day view). When the synced dataset is behind (dev without TMS, paused
+  // ETL, etc.), we widen to `last1year` so the dashboard never opens empty.
+  fetch('/api/health', { credentials: 'same-origin' })
+    .then(r => r.ok ? r.json() : {})
+    .catch(() => ({}))
+    .then(h => {
+      const pill = document.getElementById('envPill');
+      if (pill) {
+        if (h.demo) { pill.textContent = 'demo mode'; pill.classList.add('demo'); }
+        else        { pill.textContent = 'live TMS'; pill.classList.remove('demo'); }
+      }
 
-  safe('viewSelect', () => {
-    document.getElementById('viewSelect').addEventListener('change', e => {
-      state.view = e.target.value;
-      syncViewVisibility();
-      refresh();
+      // When the synced dataset is behind "today", anchor every preset to the
+      // newest available data instead of real-now. This keeps "Last 7 Days"
+      // meaningful (7 days ending on the freshest data) and lets the dashboard
+      // open with real content by default.
+      const latest = h.latestDataAt ? new Date(h.latestDataAt).getTime() : null;
+      let nowRef = null;
+      if (latest) {
+        const daysStale = (Date.now() - latest) / 86400000;
+        if (daysStale > 2) { nowRef = latest; renderDataFreshness(latest, daysStale); }
+      }
+
+      bootstrap('last7', nowRef);
     });
-  });
 
-  // Bootstrap: detect demo mode pill
-  fetch('/api/health').then(r => r.json()).then(h => {
-    const pill = document.getElementById('envPill');
-    if (!pill) return;
-    if (h.demo) { pill.textContent = 'demo mode'; pill.classList.add('demo'); }
-    else        { pill.textContent = 'live TMS'; pill.classList.remove('demo'); }
-  }).catch(() => {});
+  function bootstrap(defaultPreset, nowRef) {
+    // Each init/attach is isolated: a failure in a peripheral module (modals,
+    // customer list) must never stop the dashboard from loading its data on open.
+    safe('Period.init',        () => Period.init({ onApply: refresh, defaultPreset, nowRef }));
+    safe('CustomerFilter.init',() => CustomerFilter.init({ onChange: refresh }));
+    safe('Drilldown.attach',   () => Drilldown.attach());
+    safe('EmailModal.attach',  () => EmailModal.attach());
 
-  safe('syncViewVisibility', syncViewVisibility);
+    safe('viewSelect', () => {
+      document.getElementById('viewSelect').addEventListener('change', e => {
+        state.view = e.target.value;
+        syncViewVisibility();
+        refresh();
+      });
+    });
 
-  // Always load data on open — this is the default 1-week view the user sees.
-  refresh();
+    safe('syncViewVisibility', syncViewVisibility);
+    refresh();
+  }
+
+  function renderDataFreshness(latestMs, daysStale) {
+    const host = document.getElementById('activePill');
+    if (!host) return;
+    // A small note under the topbar. Only shown when data is > 2 days behind,
+    // to avoid noise on a live-ETL production deployment.
+    if (daysStale <= 2) return;
+    let el = document.getElementById('dataFreshness');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'dataFreshness';
+      el.className = 'data-freshness';
+      const container = document.querySelector('.container');
+      if (container) container.insertBefore(el, container.firstChild);
+    }
+    const d = new Date(latestMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const days = Math.round(daysStale);
+    el.textContent = `Local dataset is ${days} days behind — showing data as of ${d}. All time windows (Last 7 Days, This Month, etc.) are anchored to this date.`;
+  }
 
   function safe(label, fn) {
     try { fn(); }

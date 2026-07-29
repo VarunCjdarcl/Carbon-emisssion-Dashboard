@@ -16,6 +16,7 @@ const CustomerView = (() => {
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
+    if (period.nowRef) params.set('now', String(period.nowRef));
     if (customerCode) params.set('customer', customerCode);
     let data;
     try {

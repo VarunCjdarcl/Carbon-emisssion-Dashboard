@@ -155,7 +155,7 @@ a:hover { text-decoration: underline; }
 .last-updated strong { color: #fff; font-weight: 600; }
 
 /* ============== Container ============== */
-.container { padding: 26px 32px 80px; max-width: 1440px; margin: 0 auto; }
+.container { padding: 26px 32px 80px; max-width: 100%; margin: 0; }
 
 /* ============== Toolbar ============== */
 .toolbar { margin-bottom: 22px; position: relative; z-index: 10; }
@@ -698,6 +698,41 @@ a:hover { text-decoration: underline; }
   .customer-dropdown { left: 16px; right: 16px; width: auto; }
   .kpi-value { font-size: 26px; }
   .total-emission-value strong { font-size: 28px; }
+}
+
+/* ============== Data freshness banner ============== */
+.data-freshness {
+  margin: 12px 0 -4px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #fff7ed, #ffedd5);
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-size: 12.5px;
+  border-radius: var(--radius-md);
+}
+
+/* ============== User chip & logout ============== */
+.user-chip {
+  display: flex; align-items: center; gap: 12px;
+  position: relative; z-index: 1;
+}
+.user-info { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.user-name { font-size: 13px; font-weight: 600; color: #fff; }
+.user-email { font-size: 11px; color: rgba(255,255,255,0.66); }
+.logout-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+  color: #fff; font-weight: 600; font-size: 12.5px;
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(4px);
+}
+.logout-btn:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.34); }
+.logout-btn:active { transform: translateY(1px); }
+@media (max-width: 640px) {
+  .user-info { display: none; }
+  .logout-btn { padding: 7px 10px; }
 }
 
 /* ============== Print ============== */

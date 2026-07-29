@@ -12,7 +12,12 @@ function startOfWeekMonday(d) {
 }
 
 function resolvePreset(preset, opts = {}) {
-  const now = opts.now ? new Date(opts.now) : new Date();
+  // opts.now can arrive as a numeric string on the query string ("1780489751000"),
+  // which `new Date()` misinterprets as an invalid date-string. Coerce first.
+  let nowInput = opts.now;
+  if (typeof nowInput === 'string' && /^\d+$/.test(nowInput)) nowInput = Number(nowInput);
+  const now = nowInput ? new Date(nowInput) : new Date();
+  if (isNaN(now.getTime())) return { from: null, till: null };
   let from, till;
   switch (preset) {
     case 'today':

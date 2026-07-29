@@ -12,8 +12,8 @@ const { sendCertificateEmail } = require('../services/mailer');
 // In-memory audit log of certificate dispatches
 const auditLog = [];
 
-async function buildCertificatePayload({ code, preset, from, till }) {
-  const range = resolvePreset(preset, { from, till });
+async function buildCertificatePayload({ code, preset, from, till, now }) {
+  const range = resolvePreset(preset, { from, till, now });
   // Single indexed aggregate query — no row materialization.
   const t = db.getCustomerTotals(code, range.from, range.till);
   return {
@@ -34,9 +34,9 @@ async function buildCertificatePayload({ code, preset, from, till }) {
 // `customer` is the company NAME, passed as a query param.
 router.get('/customer.pdf', async (req, res, next) => {
   try {
-    const { customer, preset = 'thisMonth', from, till } = req.query;
+    const { customer, preset = 'thisMonth', from, till, now } = req.query;
     if (!customer) return res.status(400).json({ error: 'customer required' });
-    const payload = await buildCertificatePayload({ code: customer, preset, from, till });
+    const payload = await buildCertificatePayload({ code: customer, preset, from, till, now });
     const filename = `${payload.customerName.replace(/[^a-zA-Z0-9]+/g, '_')}_Certificate_${payload.periodLabel.replace(/\s+/g, '')}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
@@ -53,13 +53,13 @@ router.get('/customer.pdf', async (req, res, next) => {
 // rendered certificate.
 router.post('/send', express.json(), async (req, res, next) => {
   try {
-    const { customerCode, preset = 'thisMonth', from, till, to, cc, subject, body } = req.body || {};
+    const { customerCode, preset = 'thisMonth', from, till, now, to, cc, subject, body } = req.body || {};
     if (!customerCode) return res.status(400).json({ error: 'customerCode required' });
     if (!to) return res.status(400).json({ error: 'To address required' });
     if (!subject) return res.status(400).json({ error: 'Subject required' });
     if (!body) return res.status(400).json({ error: 'Body required' });
 
-    const payload = await buildCertificatePayload({ code: customerCode, preset, from, till });
+    const payload = await buildCertificatePayload({ code: customerCode, preset, from, till, now });
 
     const escape = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'

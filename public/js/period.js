@@ -22,14 +22,24 @@ const Period = (() => {
     till: null,
     hoverTs: null,         // day under the cursor while picking the 2nd endpoint
     visMonth: new Date(),  // calendar visible month
+    // Reference "now" for computing preset windows. Real time by default, but
+    // app.js overrides this with the newest-synced shipment date when the ETL
+    // is behind — so "Last 7 Days" resolves to the 7 days ending on the freshest
+    // data instead of a window past the data cliff.
+    nowRef: null,
   };
 
   let calCells = [];       // live references to the 42 day cells for in-place repaint
 
   let onApplyCb = () => {};
 
-  function init({ onApply }) {
+  function init({ onApply, defaultPreset, nowRef }) {
     onApplyCb = onApply || (() => {});
+    if (defaultPreset) state.preset = defaultPreset;
+    if (nowRef) {
+      state.nowRef = Number(nowRef);
+      state.visMonth = new Date(state.nowRef);
+    }
     renderPresets();
 
     document.getElementById('periodBtn').addEventListener('click', e => {
@@ -56,8 +66,10 @@ const Period = (() => {
       dd.hidden = true;
     });
 
-    // Default: Last 7 Days (always shows a full week of recent data on open)
-    selectPreset('last7', { silent: true });
+    // Default preset: `last7` unless the caller (app.js bootstrap) told us the
+    // synced data is stale, in which case a wider window is picked so the
+    // dashboard never opens on an empty chart.
+    selectPreset(state.preset, { silent: true });
     syncButtons();
   }
 
@@ -111,7 +123,7 @@ const Period = (() => {
   }
 
   function computePresetRange(id) {
-    const now = new Date();
+    const now = state.nowRef ? new Date(state.nowRef) : new Date();
     const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
     const endOfDay   = d => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
     const addDays    = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
@@ -242,6 +254,7 @@ const Period = (() => {
       preset: state.preset,
       from: state.from,
       till: state.till,
+      nowRef: state.nowRef,
     };
   }
 

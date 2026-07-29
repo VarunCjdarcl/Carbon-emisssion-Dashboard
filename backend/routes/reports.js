@@ -10,9 +10,9 @@ const { resolvePreset, presetLabel } = require('../services/dateRange');
 // dots/slashes that would break a path segment).
 router.get('/customer.xlsx', async (req, res, next) => {
   try {
-    const { customer, preset = 'thisMonth', from, till } = req.query;
+    const { customer, preset = 'thisMonth', from, till, now } = req.query;
     if (!customer) return res.status(400).json({ error: 'customer required' });
-    const range = resolvePreset(preset, { from, till });
+    const range = resolvePreset(preset, { from, till, now });
     const filtered = db.getShipmentsByCustomerInRange(customer, range.from, range.till);
     const customerName = (filtered[0]?.customerName || customer).replace(/[^a-zA-Z0-9]+/g, '_');
 

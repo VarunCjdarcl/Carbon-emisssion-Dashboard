@@ -67,6 +67,7 @@ CJ Darcl Sustainability Desk`;
       preset: period.preset || 'thisMonth',
       from: period.preset === 'custom' ? period.from : undefined,
       till: period.preset === 'custom' ? period.till : undefined,
+      now: period.nowRef || undefined,
       to: form.to.value.trim(),
       cc: form.cc.value.trim(),
       subject: form.subject.value.trim(),

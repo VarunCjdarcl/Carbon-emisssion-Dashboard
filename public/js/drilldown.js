@@ -66,6 +66,7 @@ const Drilldown = (() => {
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
+    if (period.nowRef) params.set('now', String(period.nowRef));
     let data;
     try {
       data = await Util.api('/api/emissions/customer-shipments?' + params.toString());
@@ -169,6 +170,7 @@ const Drilldown = (() => {
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
+    if (period.nowRef) params.set('now', String(period.nowRef));
     const url = '/api/reports/customer.xlsx?' + params.toString();
     window.location.href = url;
   }

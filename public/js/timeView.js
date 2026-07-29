@@ -9,6 +9,7 @@ const TimeView = (() => {
     if (period.preset === 'custom' && period.from && period.till) {
       params.set('from', period.from); params.set('till', period.till);
     }
+    if (period.nowRef) params.set('now', String(period.nowRef));
     let data;
     try {
       data = await Util.api('/api/emissions/time?' + params.toString(), { signal });

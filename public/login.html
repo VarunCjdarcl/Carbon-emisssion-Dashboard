@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — Carbon Emission Dashboard</title>
+  <link rel="icon" type="image/webp" href="/assets/logo.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <style>
+    :root {
+      --navy-900:#0b1530; --navy-700:#1a2b5f; --navy-500:#2e478f;
+      --accent:#f97316; --accent-strong:#ea580c;
+      --border:#e6eaf2; --text-primary:#0b1530; --text-secondary:#475266; --text-muted:#8892a8;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text-primary);
+      background:
+        radial-gradient(1200px 700px at 10% -10%, #dfeaff 0%, transparent 60%),
+        radial-gradient(900px 600px at 110% 110%, #ffe7d1 0%, transparent 60%),
+        linear-gradient(180deg, #f4f7fc 0%, #eef2fa 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 32px 16px;
+    }
+    .card {
+      width: 100%; max-width: 420px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 24px 56px rgba(15, 26, 62, .16), 0 8px 24px rgba(15, 26, 62, .10);
+      padding: 32px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .brand img { width: 44px; height: 44px; border-radius: 10px; object-fit: contain; background: #fff; padding: 4px; border: 1px solid var(--border); }
+    .brand h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    .brand p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+    h2 { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+    .sub { margin: 0 0 24px; color: var(--text-secondary); font-size: 14px; }
+    label { display: block; margin-bottom: 14px; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+    label span { display: block; margin-bottom: 6px; }
+    input[type=email], input[type=password] {
+      width: 100%; padding: 11px 12px;
+      border: 1px solid var(--border); border-radius: 10px;
+      font: inherit; font-size: 14px; color: var(--text-primary);
+      background: #fff; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus { outline: none; border-color: var(--navy-500); box-shadow: 0 0 0 3px rgba(46,71,143,.15); }
+    button {
+      width: 100%; margin-top: 8px;
+      padding: 12px 14px; border: none; border-radius: 10px;
+      background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+      color: #fff; font: inherit; font-weight: 600; font-size: 14px;
+      cursor: pointer; box-shadow: 0 8px 24px rgba(249,115,22,.30);
+      transition: transform .05s, filter .15s;
+    }
+    button:hover { filter: brightness(1.02); }
+    button:active { transform: translateY(1px); }
+    button[disabled] { opacity: .6; cursor: default; }
+    .error {
+      margin-top: 14px; padding: 10px 12px;
+      border-radius: 10px; border: 1px solid #fecaca;
+      background: #fef2f2; color: #b91c1c; font-size: 13px;
+    }
+    .foot { margin-top: 18px; text-align: center; font-size: 12px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <form class="card" id="loginForm" autocomplete="on">
+    <div class="brand">
+      <img src="/assets/logo.webp" alt="CJ Darcl" />
+      <div>
+        <h1>CJ Darcl Logistics</h1>
+        <p>Carbon Emission Dashboard</p>
+      </div>
+    </div>
+    <h2>Sign in</h2>
+    <p class="sub">Use your CJ Darcl email to continue.</p>
+
+    <label>
+      <span>Email</span>
+      <input type="email" name="email" required autocomplete="username" placeholder="name@cjdarcl.com" />
+    </label>
+    <label>
+      <span>Password</span>
+      <input type="password" name="password" required autocomplete="current-password" />
+    </label>
+    <button type="submit" id="submitBtn">Sign in</button>
+    <div class="error" id="err" hidden></div>
+    <div class="foot">Restricted access · Authorized users only</div>
+  </form>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const err  = document.getElementById('err');
+    const btn  = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      const fd = new FormData(form);
+      const payload = { email: fd.get('email'), password: fd.get('password') };
+
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+        });
+        if (r.ok) {
+          window.location.replace('/');
+          return;
+        }
+        const data = await r.json().catch(() => ({}));
+        err.textContent = data.error || 'Sign in failed.';
+        err.hidden = false;
+      } catch (ex) {
+        err.textContent = 'Network error. Please try again.';
+        err.hidden = false;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

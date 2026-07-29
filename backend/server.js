@@ -12,9 +12,44 @@ const fs = require('fs');
 const emissionsRouter = require('./routes/emissions');
 const reportsRouter = require('./routes/reports');
 const certificateRouter = require('./routes/certificate');
+const { router: authRouter, requireAuth } = require('./routes/auth');
 
 const app = express();
 const PORT = Number(process.env.PORT || 4101);
+
+// Minimal cookie parser — avoids adding a new dependency. Populates req.cookies.
+function parseCookies(req, _res, next) {
+  const header = req.headers.cookie || '';
+  const jar = {};
+  header.split(';').forEach(part => {
+    const idx = part.indexOf('=');
+    if (idx < 0) return;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (k) jar[k] = decodeURIComponent(v);
+  });
+  req.cookies = jar;
+  next();
+}
+
+// res.cookie shim so auth.js can call res.cookie / res.clearCookie without
+// adding cookie-parser as a dependency.
+function cookieHelpers(_req, res, next) {
+  res.cookie = function (name, value, opts = {}) {
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+    if (opts.maxAge != null) parts.push(`Max-Age=${Math.floor(opts.maxAge / 1000)}`);
+    if (opts.path) parts.push(`Path=${opts.path}`);
+    if (opts.sameSite) parts.push(`SameSite=${opts.sameSite}`);
+    if (opts.httpOnly) parts.push('HttpOnly');
+    if (opts.secure) parts.push('Secure');
+    res.append('Set-Cookie', parts.join('; '));
+    return res;
+  };
+  res.clearCookie = function (name, opts = {}) {
+    return res.cookie(name, '', { ...opts, maxAge: 0 });
+  };
+  next();
+}
 
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').trim();
 const IS_PROD = (process.env.NODE_ENV || '').toLowerCase() === 'production';
@@ -26,17 +61,29 @@ app.use(cors(PUBLIC_BASE_URL && IS_PROD
   : {}));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
+app.use(parseCookies);
+app.use(cookieHelpers);
 
-app.use('/api/emissions', emissionsRouter);
-app.use('/api/reports', reportsRouter);
-app.use('/api/certificate', certificateRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/emissions', requireAuth, emissionsRouter);
+app.use('/api/reports', requireAuth, reportsRouter);
+app.use('/api/certificate', requireAuth, certificateRouter);
 
 app.get('/api/health', (req, res) => {
+  // Expose the newest shipment timestamp so the frontend can widen its default
+  // preset when the synced dataset is behind "today" (e.g. local dev with no
+  // TMS reachability, or a paused ETL). Cheap query — hits an indexed MAX().
+  let latestDataAt = null;
+  try {
+    const stats = require('./services/shipmentStore').getEtlStatus();
+    if (stats && stats.newest) latestDataAt = new Date(stats.newest).toISOString();
+  } catch (_) { /* stats optional — never fail health */ }
   res.json({
     ok: true,
     demo: (process.env.DEMO_MODE || 'true').toLowerCase() === 'true',
     baseUrl: PUBLIC_BASE_URL || null,
     time: new Date().toISOString(),
+    latestDataAt,
   });
 });
 
@@ -61,6 +108,20 @@ app.get('/api/etl/status', (req, res) => {
 });
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// Gate the dashboard shell behind auth. Static assets (css/js/img) remain
+// public so the login page can render, but hitting "/" or "/index.html"
+// without a valid session bounces the user to /login.html.
+const { peekSession } = require('./routes/auth');
+app.use((req, res, next) => {
+  const isShell = req.path === '/' || req.path === '/index.html';
+  if (!isShell) return next();
+  if (!peekSession(req.cookies && req.cookies.auth_token)) {
+    return res.redirect('/login.html');
+  }
+  next();
+});
+
 app.use(express.static(PUBLIC_DIR, {
   maxAge: '1h',
   index: 'index.html',
