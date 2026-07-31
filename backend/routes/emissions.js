@@ -4,13 +4,48 @@ const router = express.Router();
 const db = require('../services/db');
 const store = require('../services/shipmentStore');
 const rollup = require('../services/rollup');
+const etl = require('../services/etl');
 const { resolvePreset, presetLabel } = require('../services/dateRange');
+
+const ONE_DAY_MS = 86400000;
+// Cache "we just pulled window X" per range so a chart with 3-4 concurrent
+// requests (time + customers + customer-list) doesn't fire 3-4 TMS syncs.
+// Entries expire after 5 min — enough to coalesce a page load, short enough
+// that the next visit re-checks.
+const lazyFillCache = new Map();
+const LAZY_FILL_TTL_MS = 5 * 60 * 1000;
+
+// If the requested window extends past what the ETL has synced, pull the
+// missing slice from TMS on the spot and refresh the rollup so the chart
+// renders with real data. Runs at most once per (from,till) window per 5 min.
+// Never throws: if TMS is down or the token is bad, we log and let the caller
+// aggregate whatever is already in the DB.
+async function lazyFillIfStale(from, till) {
+  try {
+    const stats = db.getStats();
+    const newest = stats.newest || 0;
+    // Window fully inside what we already have → nothing to do.
+    if (till <= newest + ONE_DAY_MS) return;
+    const key = `${from}-${till}`;
+    const cached = lazyFillCache.get(key);
+    if (cached && Date.now() - cached < LAZY_FILL_TTL_MS) return;
+    lazyFillCache.set(key, Date.now());
+    console.log(`[lazyfill] window ${new Date(from).toISOString().slice(0,10)}..${new Date(till).toISOString().slice(0,10)} not covered (newest=${new Date(newest).toISOString().slice(0,10)}) — pulling from TMS`);
+    await etl.ensureCovered(from, till);
+    // ensureCovered writes shipments; refresh the rollup for the same window
+    // so the aggregate query returns the fresh rows.
+    rollup.refreshRange(from, till);
+  } catch (err) {
+    console.warn('[lazyfill] failed — serving whatever the DB has:', err.message);
+  }
+}
 
 // GET /api/emissions/time?preset=thisMonth&from=&till=&customer=
 router.get('/time', async (req, res, next) => {
   try {
     const { preset = 'thisMonth', from, till, customer, now } = req.query;
     const range = resolvePreset(preset, { from, till, now });
+    await lazyFillIfStale(range.from, range.till);
     const agg = rollup.aggregateTime({ ...range, preset, customerCode: customer });
     res.json({
       preset,
@@ -28,6 +63,7 @@ router.get('/customers', async (req, res, next) => {
   try {
     const { preset = 'thisMonth', from, till, customer, now } = req.query;
     const range = resolvePreset(preset, { from, till, now });
+    await lazyFillIfStale(range.from, range.till);
     const agg = rollup.aggregateByCustomer({ ...range, customerCode: customer });
     res.json({
       preset,
@@ -65,6 +101,7 @@ router.get('/customer-shipments', async (req, res, next) => {
     const { customer, preset = 'thisMonth', from, till, now } = req.query;
     if (!customer) return res.status(400).json({ error: 'customer required' });
     const range = resolvePreset(preset, { from, till, now });
+    await lazyFillIfStale(range.from, range.till);
     const filtered = db.getShipmentsByCustomerInRange(customer, range.from, range.till);
 
     res.json({
