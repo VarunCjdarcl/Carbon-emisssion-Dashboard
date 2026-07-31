@@ -10,6 +10,17 @@
 
 const tms = require('./tmsClient');
 const db = require('./db');
+// `rollup` is loaded lazily — it depends on `db`, and requiring at module top
+// would create a load-order dependency during db bootstrap.
+let rollup;
+function refreshRollupSafe(from, till) {
+  try {
+    if (!rollup) rollup = require('./rollup');
+    rollup.refreshRange(from, till);
+  } catch (err) {
+    console.warn('[etl] post-sync rollup refresh failed:', err.message);
+  }
+}
 
 const ONE_DAY_MS = 86400000;
 const BACKFILL_DAYS = Number(process.env.ETL_BACKFILL_DAYS || 180);
@@ -28,6 +39,9 @@ async function syncRange(from, till, label = 'sync') {
   // already returns mapped shipment objects in dashboard shape.
   const items = await tms.fetchAllShipmentsInRange({ from, till });
   db.upsertMany(items);
+  // Keep the daily rollup in sync with the shipments we just wrote — otherwise
+  // fresh shipments only show up in charts after the next 02:00 IST rebuild.
+  if (items.length > 0) refreshRollupSafe(from, till);
   const elapsed = Date.now() - t0;
   console.log(`[etl] ${label} ${new Date(from).toISOString().slice(0,10)}..${new Date(till).toISOString().slice(0,10)}: ${items.length} shipments in ${elapsed}ms`);
   return items.length;

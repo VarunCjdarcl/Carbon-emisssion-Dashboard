@@ -1,0 +1,3 @@
+# Force LF for shell scripts — the Webmin server runs bash, and Windows-style
+# CRLF endings cause "bad interpreter" failures when the deploy script runs.
+*.sh text eol=lf

@@ -1,0 +1,37 @@
+name: Deploy to Webmin server
+
+# Fires on every push to main. Manual re-run is available from the Actions tab
+# via workflow_dispatch — handy when you need to re-deploy without a new commit.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only one deploy at a time. If a second push lands while a deploy is running,
+# it queues and the newer one supersedes any older queued run.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger remote deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          # The `script` block runs on the Webmin box. It sources the user's
+          # profile so nvm-installed node/pm2 are on PATH, then hands off to
+          # the versioned deploy script in the repo.
+          script: |
+            set -e
+            export APP_DIR="${{ secrets.DEPLOY_PATH }}"
+            export PM2_APP_NAME="${{ secrets.PM2_APP_NAME }}"
+            if [ -f "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; fi
+            if [ -f "$HOME/.profile" ]; then . "$HOME/.profile"; fi
+            cd "$APP_DIR"
+            bash scripts/deploy.sh

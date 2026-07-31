@@ -6,18 +6,28 @@ const router = express.Router();
 const USERS = [
   {
     email: 'varun2.sharma@cjdarcl.com',
-    password: 'Carbon@2026',
+    password: 'Varun@Carbon2026',
     name: 'Varun Sharma',
   },
   {
     email: 'beauty.pandey@cjdarcl.com',
-    password: 'Carbon@2026',
+    password: 'Beauty@Emission2026',
     name: 'Beauty Pandey',
   },
   {
     email: 'vaishnavi.singh@cjdarcl.com',
-    password: 'Carbon@2026',
+    password: 'Vaishnavi@Green2026',
     name: 'Vaishnavi Singh',
+  },
+  {
+    email: 'harshit.kumar@cjdarcl.com',
+    password: 'Harshit@Fleet2026',
+    name: 'Harshit Kumar',
+  },
+  {
+    email: 'prem.singh@cjdarcl.com',
+    password: 'Prem@Logistics2026',
+    name: 'Prem Singh',
   },
 ];
 
