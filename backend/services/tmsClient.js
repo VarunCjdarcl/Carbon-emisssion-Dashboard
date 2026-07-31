@@ -3,7 +3,7 @@ const { shipments: MOCK_SHIPMENTS, customers: MOCK_CUSTOMERS } = require('../dat
 
 const BASE = process.env.TMS_BASE_URL || 'https://tmsapis.cjdarcl.com';
 const TOKEN = process.env.TMS_AUTH_TOKEN || '';
-const DEMO = (process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
+const DEMO = (process.env.DEMO_MODE || 'false').toLowerCase() === 'true';
 
 const http = axios.create({
   baseURL: BASE,

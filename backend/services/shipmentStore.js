@@ -11,7 +11,7 @@ const db = require('./db');
 const etl = require('./etl');
 
 const ETL_ENABLED = (process.env.ETL_ENABLED || 'true').toLowerCase() === 'true'
-  && (process.env.DEMO_MODE || 'true').toLowerCase() !== 'true';
+  && (process.env.DEMO_MODE || 'false').toLowerCase() !== 'true';
 
 async function getShipmentsInRange({ from, till }) {
   if (!ETL_ENABLED) return tms.getShipmentsInRange({ from, till });

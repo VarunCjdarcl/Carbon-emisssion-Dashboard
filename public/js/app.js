@@ -25,15 +25,14 @@
         else        { pill.textContent = 'live TMS'; pill.classList.remove('demo'); }
       }
 
-      // When the synced dataset is behind "today", anchor every preset to the
-      // newest available data instead of real-now. This keeps "Last 7 Days"
-      // meaningful (7 days ending on the freshest data) and lets the dashboard
-      // open with real content by default.
+      // When the synced dataset is behind "today", silently anchor every
+      // preset to the newest available data instead of real-now. No user-
+      // visible warning — the presets just work with whatever data exists.
       const latest = h.latestDataAt ? new Date(h.latestDataAt).getTime() : null;
       let nowRef = null;
       if (latest) {
         const daysStale = (Date.now() - latest) / 86400000;
-        if (daysStale > 2) { nowRef = latest; renderDataFreshness(latest, daysStale); }
+        if (daysStale > 2) nowRef = latest;
       }
 
       bootstrap('last7', nowRef);
@@ -57,25 +56,6 @@
 
     safe('syncViewVisibility', syncViewVisibility);
     refresh();
-  }
-
-  function renderDataFreshness(latestMs, daysStale) {
-    const host = document.getElementById('activePill');
-    if (!host) return;
-    // A small note under the topbar. Only shown when data is > 2 days behind,
-    // to avoid noise on a live-ETL production deployment.
-    if (daysStale <= 2) return;
-    let el = document.getElementById('dataFreshness');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'dataFreshness';
-      el.className = 'data-freshness';
-      const container = document.querySelector('.container');
-      if (container) container.insertBefore(el, container.firstChild);
-    }
-    const d = new Date(latestMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const days = Math.round(daysStale);
-    el.textContent = `Local dataset is ${days} days behind — showing data as of ${d}. All time windows (Last 7 Days, This Month, etc.) are anchored to this date.`;
   }
 
   function safe(label, fn) {

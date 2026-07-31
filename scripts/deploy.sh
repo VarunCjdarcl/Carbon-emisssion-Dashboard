@@ -21,6 +21,13 @@ echo "[deploy] git fetch + reset to origin/main"
 git fetch --prune origin
 git reset --hard origin/main
 
+# Sanity: warn early if .env is missing. Without it, DEMO_MODE defaults false,
+# TMS token is unset → ETL will loudly fail on every call. Fixing this is a
+# one-time server task, not something the deploy should mask.
+if [ ! -f .env ]; then
+  echo "[deploy] WARNING: .env missing at $APP_DIR/.env — ETL will fail without TMS_AUTH_TOKEN."
+fi
+
 echo "[deploy] installing production dependencies"
 # --omit=dev skips devDependencies. better-sqlite3's native binding is rebuilt
 # here if the platform changed — safe to run on every deploy.

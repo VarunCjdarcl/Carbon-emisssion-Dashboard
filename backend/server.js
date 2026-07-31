@@ -80,7 +80,7 @@ app.get('/api/health', (req, res) => {
   } catch (_) { /* stats optional — never fail health */ }
   res.json({
     ok: true,
-    demo: (process.env.DEMO_MODE || 'true').toLowerCase() === 'true',
+    demo: (process.env.DEMO_MODE || 'false').toLowerCase() === 'true',
     baseUrl: PUBLIC_BASE_URL || null,
     time: new Date().toISOString(),
     latestDataAt,
@@ -97,6 +97,9 @@ app.get('/api/etl/status', (req, res) => {
   const stats = store.getEtlStatus();
   res.json({
     enabled: store.isEtlEnabled(),
+    demoMode: (process.env.DEMO_MODE || 'false').toLowerCase() === 'true',
+    tmsBaseUrl: process.env.TMS_BASE_URL || null,
+    tmsTokenSet: !!process.env.TMS_AUTH_TOKEN,
     shipments: stats.total,
     oldestShipment: stats.oldest ? new Date(stats.oldest).toISOString() : null,
     newestShipment: stats.newest ? new Date(stats.newest).toISOString() : null,
@@ -105,6 +108,22 @@ app.get('/api/etl/status', (req, res) => {
     lastSyncAt: stats.lastSyncAt ? new Date(stats.lastSyncAt).toISOString() : null,
     dbPath: stats.dbPath,
   });
+});
+
+// Force an incremental ETL run. Same operation the 15-min scheduler does —
+// exposed so an operator can trigger a catch-up from the browser (or curl on
+// the server) without SSHing to run pm2 commands. Auth-gated so random visitors
+// can't hammer the TMS API.
+app.post('/api/etl/sync', requireAuth, async (req, res) => {
+  const etl = require('./services/etl');
+  const t0 = Date.now();
+  try {
+    const count = await etl.syncIncremental();
+    res.json({ ok: true, count, elapsedMs: Date.now() - t0 });
+  } catch (err) {
+    console.error('[etl/sync] failed:', err && err.stack || err);
+    res.status(502).json({ ok: false, error: String(err && err.message || err), elapsedMs: Date.now() - t0 });
+  }
 });
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -163,7 +182,7 @@ startServer(() => {
   const proto = hasSsl ? 'https' : 'http';
   const shown = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL}:${PORT}` : `${proto}://localhost:${PORT}`;
   console.log(`Carbon Emission Dashboard listening on ${shown} (bind 0.0.0.0:${PORT})`);
-  console.log(`Demo mode: ${(process.env.DEMO_MODE || 'true')}`);
+  console.log(`Demo mode: ${(process.env.DEMO_MODE || 'false')}`);
   // Start the ETL worker.  In live mode this kicks off either an initial
   // backfill (empty DB) or an incremental catch-up (existing DB), and then
   // schedules periodic incremental + full-refresh syncs.  All dashboard reads

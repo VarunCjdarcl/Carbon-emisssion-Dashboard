@@ -140,9 +140,14 @@ const syncIncrementalSafe = singleflight(syncIncremental);
 const syncFullRefreshSafe = singleflight(syncFullRefresh);
 
 function start() {
-  if ((process.env.DEMO_MODE || 'true').toLowerCase() === 'true') {
-    console.log('[etl] demo mode — ETL disabled');
+  const demo = (process.env.DEMO_MODE || 'false').toLowerCase() === 'true';
+  console.log(`[etl] start config → DEMO_MODE=${demo}  TMS_BASE_URL=${process.env.TMS_BASE_URL || '(default)'}  TMS_AUTH_TOKEN=${process.env.TMS_AUTH_TOKEN ? 'set('+process.env.TMS_AUTH_TOKEN.length+'chars)' : 'MISSING'}`);
+  if (demo) {
+    console.log('[etl] demo mode — ETL disabled (set DEMO_MODE=false in .env to enable live TMS sync)');
     return;
+  }
+  if (!process.env.TMS_AUTH_TOKEN) {
+    console.warn('[etl] TMS_AUTH_TOKEN not set — ETL will fail on every call');
   }
   // Decide initial action: empty DB → backfill; otherwise → incremental
   const stats = db.getStats();
