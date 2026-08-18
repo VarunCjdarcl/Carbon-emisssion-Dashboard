@@ -108,6 +108,45 @@ app.post('/api/rollup/rebuild', requireAuth, (req, res) => {
   }
 });
 
+// Hard-refresh: re-fetch the last N days from TMS and upsert. Overwrites any
+// stale rows whose customField values changed upstream after the initial
+// backfill (e.g. a corrected carbonEmissionValue). Runs in the background so
+// the HTTP request returns immediately — poll /api/etl/hard-refresh/status
+// or watch pm2 logs for `[etl] backfill chunk` lines.
+let hardRefreshState = null;
+app.post('/api/etl/hard-refresh', requireAuth, (req, res) => {
+  if (hardRefreshState && hardRefreshState.phase !== 'done' && hardRefreshState.phase !== 'failed') {
+    return res.status(409).json({ ok: false, error: 'a hard-refresh is already running', state: hardRefreshState });
+  }
+  const days = Math.max(1, Math.min(Number(req.query.days) || 365, 730));
+  hardRefreshState = { startedAt: Date.now(), days, phase: 'backfilling', shipments: 0 };
+  res.json({ ok: true, message: `hard-refresh started for last ${days} days — poll /api/etl/hard-refresh/status`, state: hardRefreshState });
+
+  (async () => {
+    const etl = require('./services/etl');
+    const rollup = require('./services/rollup');
+    try {
+      const count = await etl.backfill(days);
+      hardRefreshState.shipments = count;
+      hardRefreshState.phase = 'rebuilding rollup';
+      const rows = rollup.refreshAll();
+      hardRefreshState.rollupRows = rows;
+      hardRefreshState.phase = 'done';
+      hardRefreshState.finishedAt = Date.now();
+      console.log(`[hard-refresh] done in ${((hardRefreshState.finishedAt - hardRefreshState.startedAt) / 1000).toFixed(1)}s — ${count} shipments, ${rows} rollup rows`);
+    } catch (err) {
+      console.error('[hard-refresh] failed:', err && err.stack || err);
+      hardRefreshState.error = String(err && err.message || err);
+      hardRefreshState.phase = 'failed';
+      hardRefreshState.finishedAt = Date.now();
+    }
+  })();
+});
+
+app.get('/api/etl/hard-refresh/status', requireAuth, (req, res) => {
+  res.json(hardRefreshState || { idle: true });
+});
+
 app.get('/api/etl/status', (req, res) => {
   const store = require('./services/shipmentStore');
   const stats = store.getEtlStatus();
