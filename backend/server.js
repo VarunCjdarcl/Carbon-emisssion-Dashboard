@@ -92,6 +92,22 @@ app.get('/api/rollup/status', (req, res) => {
   res.json(rollup.getRollupStats());
 });
 
+// Force a full rollup rebuild across every day of shipments in the DB.
+// Needed after a schema change (e.g. the rail_emission column added in
+// e447133) so historic rollup rows pick up the new derivation. Auth-gated
+// because it's a couple-second table scan.
+app.post('/api/rollup/rebuild', requireAuth, (req, res) => {
+  const rollup = require('./services/rollup');
+  const t0 = Date.now();
+  try {
+    const rows = rollup.refreshAll();
+    res.json({ ok: true, rows, elapsedMs: Date.now() - t0 });
+  } catch (err) {
+    console.error('[rollup/rebuild] failed:', err && err.stack || err);
+    res.status(500).json({ ok: false, error: String(err && err.message || err), elapsedMs: Date.now() - t0 });
+  }
+});
+
 app.get('/api/etl/status', (req, res) => {
   const store = require('./services/shipmentStore');
   const stats = store.getEtlStatus();
