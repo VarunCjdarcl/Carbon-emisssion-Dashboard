@@ -154,11 +154,17 @@ const TimeView = (() => {
   }
 
   function renderTotalEmission({ totals, presetLabel }) {
-    const compact = Util.compactCO2(totals.totalRoadEmissions);
-    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(compact.value, 0);
-    document.querySelector('#totalEmissionPanel span').textContent = compact.unit;
+    const road = Util.compactCO2(totals.totalRoadEmissions);
+    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(road.value, 0);
+    document.querySelector('#totalEmissionPanel .total-emission-value span').textContent = road.unit;
     document.getElementById('totalEmissionSub').textContent =
       `Sum of all road shipments · ${presetLabel}`;
+
+    const rail = Util.compactCO2(totals.totalRailEmissions || 0);
+    document.getElementById('totalRailEmissionValue').textContent = Util.fmtNum(rail.value, 0);
+    document.querySelector('#totalRailEmissionPanel .total-emission-value span').textContent = rail.unit;
+    document.getElementById('totalRailEmissionSub').textContent =
+      `Sum of all rail shipments · ${presetLabel}`;
   }
 
   return { load };
