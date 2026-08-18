@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="/css/style.css?v=11" />
+  <link rel="stylesheet" href="/css/style.css?v=12" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -117,21 +117,11 @@
     <div class="chart-canvas-wrap"><canvas id="timeChart"></canvas></div>
     <footer class="total-emission" id="totalEmissionPanel">
       <div>
-        <h3>Total Road Emission</h3>
-        <p id="totalEmissionSub">Sum of all road shipments · This Month</p>
+        <h3>Total Emission</h3>
+        <p id="totalEmissionSub">Sum of road + rail shipments · This Month</p>
       </div>
       <div class="total-emission-value">
         <strong id="totalEmissionValue">0</strong>
-        <span>kg CO₂e</span>
-      </div>
-    </footer>
-    <footer class="total-emission rail" id="totalRailEmissionPanel">
-      <div>
-        <h3>Total Rail Emission</h3>
-        <p id="totalRailEmissionSub">Sum of all rail shipments · This Month</p>
-      </div>
-      <div class="total-emission-value">
-        <strong id="totalRailEmissionValue">0</strong>
         <span>kg CO₂e</span>
       </div>
     </footer>
@@ -229,7 +219,7 @@
 <script src="/js/util.js?v=8"></script>
 <script src="/js/period.js?v=10"></script>
 <script src="/js/customerFilter.js?v=8"></script>
-<script src="/js/timeView.js?v=12"></script>
+<script src="/js/timeView.js?v=13"></script>
 <script src="/js/customerView.js?v=10"></script>
 <script src="/js/drilldown.js?v=10"></script>
 <script src="/js/email.js?v=8"></script>

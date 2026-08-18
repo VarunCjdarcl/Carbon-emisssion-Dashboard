@@ -39,28 +39,17 @@ const TimeView = (() => {
 
   function renderKpis({ totals, presetLabel }) {
     const grid = document.getElementById('kpiGrid');
-    const road = Util.compactCO2(totals.totalRoadEmissions);
-    // `totalRailEmissions` is the actual CO2 emitted by rail shipments
-    // (sum of carbonEmissionValue where transportationMode is ByRail).
-    // `totalRailComparison` (the older field) is the aversion — kg saved by
-    // choosing rail over road. Both are shown side by side so the difference
-    // between "what we emitted on rail" and "what we saved by using rail" is
-    // legible on the dashboard.
-    const railEmit = Util.compactCO2(totals.totalRailEmissions || 0);
+    // Business asked for a single combined figure — road + rail summed into
+    // one "Total Emission" number instead of two separate tiles.
+    const combined = Util.compactCO2((totals.totalRoadEmissions || 0) + (totals.totalRailEmissions || 0));
     const rail = Util.compactCO2(totals.totalRailComparison);
     const avg = Util.compactCO2(totals.avgEmissionPerShipment);
     grid.innerHTML = `
       <div class="kpi-tile blue">
-        <div class="kpi-label">Total Road Emissions</div>
-        <div class="kpi-value">${Util.fmtNum(road.value, 0)}</div>
-        <div class="kpi-unit">${road.unit}</div>
-        <div class="kpi-delta neutral">${presetLabel}</div>
-      </div>
-      <div class="kpi-tile teal">
-        <div class="kpi-label">Total Rail Emissions</div>
-        <div class="kpi-value">${Util.fmtNum(railEmit.value, 0)}</div>
-        <div class="kpi-unit">${railEmit.unit}</div>
-        <div class="kpi-delta neutral">${presetLabel}</div>
+        <div class="kpi-label">Total Emission</div>
+        <div class="kpi-value">${Util.fmtNum(combined.value, 0)}</div>
+        <div class="kpi-unit">${combined.unit}</div>
+        <div class="kpi-delta neutral">${presetLabel} · road + rail</div>
       </div>
       <div class="kpi-tile green">
         <div class="kpi-label">Rail Aversion</div>
@@ -154,17 +143,13 @@ const TimeView = (() => {
   }
 
   function renderTotalEmission({ totals, presetLabel }) {
-    const road = Util.compactCO2(totals.totalRoadEmissions);
-    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(road.value, 0);
-    document.querySelector('#totalEmissionPanel .total-emission-value span').textContent = road.unit;
+    // Single combined figure: road + rail emissions rolled into one number,
+    // as requested by business so the panel matches the merged KPI tile above.
+    const combined = Util.compactCO2((totals.totalRoadEmissions || 0) + (totals.totalRailEmissions || 0));
+    document.getElementById('totalEmissionValue').textContent = Util.fmtNum(combined.value, 0);
+    document.querySelector('#totalEmissionPanel .total-emission-value span').textContent = combined.unit;
     document.getElementById('totalEmissionSub').textContent =
-      `Sum of all road shipments · ${presetLabel}`;
-
-    const rail = Util.compactCO2(totals.totalRailEmissions || 0);
-    document.getElementById('totalRailEmissionValue').textContent = Util.fmtNum(rail.value, 0);
-    document.querySelector('#totalRailEmissionPanel .total-emission-value span').textContent = rail.unit;
-    document.getElementById('totalRailEmissionSub').textContent =
-      `Sum of all rail shipments · ${presetLabel}`;
+      `Sum of road + rail shipments · ${presetLabel}`;
   }
 
   return { load };
