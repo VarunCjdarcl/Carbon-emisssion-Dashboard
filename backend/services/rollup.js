@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS shipment_rollup_daily (
   customer_name     TEXT,
   customer_email    TEXT,
   road_emission     REAL    NOT NULL DEFAULT 0,
+  rail_emission     REAL    NOT NULL DEFAULT 0,
   rail_aversion     REAL    NOT NULL DEFAULT 0,
   lng_aversion      REAL    NOT NULL DEFAULT 0,
   electric_aversion REAL    NOT NULL DEFAULT 0,
@@ -40,6 +41,17 @@ CREATE TABLE IF NOT EXISTS shipment_rollup_daily (
 CREATE INDEX IF NOT EXISTS idx_rollup_day      ON shipment_rollup_daily(day_ist);
 CREATE INDEX IF NOT EXISTS idx_rollup_customer ON shipment_rollup_daily(customer_code);
 `);
+// Idempotent add of the rail_emission column so existing DBs pick it up on the
+// next boot without needing a full rebuild. SQLite raises "duplicate column"
+// if it's already there — swallow that specific error, re-throw anything else.
+try {
+  const has = db.db.prepare(
+    `SELECT 1 FROM pragma_table_info('shipment_rollup_daily') WHERE name='rail_emission'`
+  ).get();
+  if (!has) db.db.exec(`ALTER TABLE shipment_rollup_daily ADD COLUMN rail_emission REAL NOT NULL DEFAULT 0`);
+} catch (err) {
+  if (!/duplicate column/i.test(err.message)) throw err;
+}
 
 // --- Day index helpers ----------------------------------------------------
 
@@ -62,10 +74,17 @@ function midIstDayMs(dayIst) {
 const deleteRangeStmt = db.db.prepare(
   `DELETE FROM shipment_rollup_daily WHERE day_ist BETWEEN ? AND ?`
 );
+// Split carbon_emission_value by transportation mode: rail-mode shipments
+// contribute to rail_emission, everything else to road_emission. TMS uses
+// "ByRoad" / "ByRail" / "ByTrain" — match either rail flavor case-insensitively.
+const isRailSql = `(
+  LOWER(COALESCE(transportation_mode, '')) LIKE '%rail%'
+  OR LOWER(COALESCE(transportation_mode, '')) LIKE '%train%'
+)`;
 const insertRangeStmt = db.db.prepare(`
 INSERT INTO shipment_rollup_daily (
   day_ist, customer_code, customer_name, customer_email,
-  road_emission, rail_aversion, lng_aversion, electric_aversion, hydrogen_aversion,
+  road_emission, rail_emission, rail_aversion, lng_aversion, electric_aversion, hydrogen_aversion,
   total_distance, shipment_count
 )
 SELECT
@@ -73,7 +92,8 @@ SELECT
   COALESCE(customer_code, '')               AS customer_code,
   MAX(customer_name)                        AS customer_name,
   MAX(customer_email)                       AS customer_email,
-  SUM(COALESCE(carbon_emission_value, 0))   AS road_emission,
+  SUM(CASE WHEN ${isRailSql} THEN 0 ELSE COALESCE(carbon_emission_value, 0) END) AS road_emission,
+  SUM(CASE WHEN ${isRailSql} THEN COALESCE(carbon_emission_value, 0) ELSE 0 END) AS rail_emission,
   SUM(COALESCE(aversion_value_rail, 0))     AS rail_aversion,
   SUM(COALESCE(aversion_value_lng, 0))      AS lng_aversion,
   SUM(COALESCE(aversion_value_electric, 0)) AS electric_aversion,
@@ -130,9 +150,10 @@ function refreshAll() {
 
 const dailySeriesStmt = db.db.prepare(`
 SELECT day_ist,
-       SUM(road_emission)  AS road,
-       SUM(rail_aversion)  AS rail,
-       SUM(shipment_count) AS cnt
+       SUM(road_emission)   AS road,
+       SUM(rail_emission)   AS railEmission,
+       SUM(rail_aversion)   AS rail,
+       SUM(shipment_count)  AS cnt
 FROM shipment_rollup_daily
 WHERE day_ist BETWEEN ? AND ?
 GROUP BY day_ist
@@ -140,9 +161,10 @@ ORDER BY day_ist
 `);
 const dailySeriesByCustomerStmt = db.db.prepare(`
 SELECT day_ist,
-       SUM(road_emission)  AS road,
-       SUM(rail_aversion)  AS rail,
-       SUM(shipment_count) AS cnt
+       SUM(road_emission)   AS road,
+       SUM(rail_emission)   AS railEmission,
+       SUM(rail_aversion)   AS rail,
+       SUM(shipment_count)  AS cnt
 FROM shipment_rollup_daily
 WHERE day_ist BETWEEN ? AND ?
   AND COALESCE(customer_name, customer_code) = ?
@@ -182,7 +204,8 @@ function customerTotalsForRange(fromMs, tillMs) {
 function hourSeriesFromShipments(fromMs, tillMs, customerCode) {
   const sql = `
     SELECT (COALESCE(completion_time, shipment_date) + ${IST_OFFSET_MS}) / ${ONE_HOUR_MS} AS hour_ist,
-           SUM(COALESCE(carbon_emission_value, 0)) AS road,
+           SUM(CASE WHEN ${isRailSql} THEN 0 ELSE COALESCE(carbon_emission_value, 0) END) AS road,
+           SUM(CASE WHEN ${isRailSql} THEN COALESCE(carbon_emission_value, 0) ELSE 0 END) AS railEmission,
            SUM(COALESCE(aversion_value_rail, 0))   AS rail,
            COUNT(*)                                AS cnt
     FROM shipments
@@ -206,22 +229,24 @@ function aggregateTime({ from, till, preset, customerCode }) {
   const rows = dailySeries(from, till, customerCode);
 
   const buckets = new Map();
-  let totalRoad = 0, totalRail = 0, totalCount = 0;
+  let totalRoad = 0, totalRailEm = 0, totalRail = 0, totalCount = 0;
   for (const r of rows) {
     const ts = midIstDayMs(r.day_ist);
     const key = g.key(ts, from);
     const label = g.label(ts, from);
     if (!buckets.has(key)) {
-      buckets.set(key, { key, label, sortTs: ts, road: 0, rail: 0, count: 0 });
+      buckets.set(key, { key, label, sortTs: ts, road: 0, railEmission: 0, rail: 0, count: 0 });
     }
     const b = buckets.get(key);
-    b.road  += r.road || 0;
-    b.rail  += r.rail || 0;
-    b.count += r.cnt  || 0;
+    b.road         += r.road         || 0;
+    b.railEmission += r.railEmission || 0;
+    b.rail         += r.rail         || 0;
+    b.count        += r.cnt          || 0;
     if (ts < b.sortTs) b.sortTs = ts;
-    totalRoad  += r.road || 0;
-    totalRail  += r.rail || 0;
-    totalCount += r.cnt  || 0;
+    totalRoad   += r.road         || 0;
+    totalRailEm += r.railEmission || 0;
+    totalRail   += r.rail         || 0;
+    totalCount  += r.cnt          || 0;
   }
 
   fillEmptyBuckets(buckets, from, till, granularity);
@@ -232,11 +257,13 @@ function aggregateTime({ from, till, preset, customerCode }) {
     series: series.map(b => ({
       label: b.label,
       road:  round2(b.road),
+      railEmission: round2(b.railEmission || 0),
       rail:  round2(b.rail),
       count: b.count,
     })),
     totals: {
       totalRoadEmissions:    round2(totalRoad),
+      totalRailEmissions:    round2(totalRailEm),
       totalRailComparison:   round2(totalRail),
       totalShipments:        totalCount,
       avgEmissionPerShipment: totalCount ? round2(totalRoad / totalCount) : 0,
@@ -248,22 +275,24 @@ function aggregateTimeHourly(from, till, customerCode) {
   const g = GRANULARITY.hour;
   const rows = hourSeriesFromShipments(from, till, customerCode);
   const buckets = new Map();
-  let totalRoad = 0, totalRail = 0, totalCount = 0;
+  let totalRoad = 0, totalRailEm = 0, totalRail = 0, totalCount = 0;
   for (const r of rows) {
     const ts = r.hour_ist * ONE_HOUR_MS - IST_OFFSET_MS + 30 * 60 * 1000; // mid-hour
     const key = g.key(ts, from);
     const label = g.label(ts, from);
     if (!buckets.has(key)) {
-      buckets.set(key, { key, label, sortTs: ts, road: 0, rail: 0, count: 0 });
+      buckets.set(key, { key, label, sortTs: ts, road: 0, railEmission: 0, rail: 0, count: 0 });
     }
     const b = buckets.get(key);
-    b.road  += r.road || 0;
-    b.rail  += r.rail || 0;
-    b.count += r.cnt  || 0;
+    b.road         += r.road         || 0;
+    b.railEmission += r.railEmission || 0;
+    b.rail         += r.rail         || 0;
+    b.count        += r.cnt          || 0;
     if (ts < b.sortTs) b.sortTs = ts;
-    totalRoad  += r.road || 0;
-    totalRail  += r.rail || 0;
-    totalCount += r.cnt  || 0;
+    totalRoad   += r.road         || 0;
+    totalRailEm += r.railEmission || 0;
+    totalRail   += r.rail         || 0;
+    totalCount  += r.cnt          || 0;
   }
   fillEmptyBuckets(buckets, from, till, 'hour');
   const series = Array.from(buckets.values()).sort((a, b) => a.sortTs - b.sortTs);
@@ -272,11 +301,13 @@ function aggregateTimeHourly(from, till, customerCode) {
     series: series.map(b => ({
       label: b.label,
       road:  round2(b.road),
+      railEmission: round2(b.railEmission || 0),
       rail:  round2(b.rail),
       count: b.count,
     })),
     totals: {
       totalRoadEmissions:    round2(totalRoad),
+      totalRailEmissions:    round2(totalRailEm),
       totalRailComparison:   round2(totalRail),
       totalShipments:        totalCount,
       avgEmissionPerShipment: totalCount ? round2(totalRoad / totalCount) : 0,

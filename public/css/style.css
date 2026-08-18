@@ -386,6 +386,8 @@ a:hover { text-decoration: underline; }
 .kpi-tile.orange::after  { background: radial-gradient(circle, var(--accent) 0%, transparent 70%); }
 .kpi-tile.navy::before { background: linear-gradient(180deg, var(--navy-700), var(--navy-500)); }
 .kpi-tile.navy::after  { background: radial-gradient(circle, var(--navy-700) 0%, transparent 70%); }
+.kpi-tile.teal::before { background: linear-gradient(180deg, #0d9488, #14b8a6); }
+.kpi-tile.teal::after  { background: radial-gradient(circle, #14b8a6 0%, transparent 70%); }
 .kpi-label {
   font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 10px;
   letter-spacing: 0.3px; text-transform: uppercase;
