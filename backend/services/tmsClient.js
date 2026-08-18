@@ -23,11 +23,14 @@ const LIST_TTL_MS = 30 * 60 * 1000;
 // Single in-flight promise per cacheKey, so concurrent dashboard endpoints
 // (time + customers + customer-list) trigger only one upstream fetch.
 const inFlight = new Map();
-// Per-window upstream page size.  The TMS list endpoint accepts up to ~10k
-// per call, but anything above ~2000 frequently makes nginx return 504, and
-// concurrent large queries make it worse.  At size=2000 a single 7-day window
-// completes in ~3-5s and rarely hits the cap.
-const PAGE_SIZE = 2000;
+// Per-window upstream page size.  TMS list endpoint silently truncates at
+// this value — if a window has more shipments than PAGE_SIZE, the rest are
+// dropped.  Business's daily shipment volume is ~2700+ so size=2000 with
+// 14-day chunks was losing ~95% of road shipments (rail slipped through
+// because its per-day volume is small).  Raised to 10000 (tested: TMS handles
+// this fine) and coupled with 1-day chunks below so no window ever gets
+// truncated in practice.
+const PAGE_SIZE = 10000;
 
 function cfMap(item) {
   if (!item || !Array.isArray(item.customFields)) return {};
@@ -176,7 +179,10 @@ async function fetchListPage({ from, till, shipmentType = null, size = PAGE_SIZE
 // out (504) on broad-range / size=5000 queries and resets connections under
 // concurrent load, so we proactively slice into ~7-day windows, fetch with
 // bounded concurrency, and retry transient failures.
-const CHUNK_MS = 14 * 86400000;
+// 1-day chunks — matches the boundary at which fetchWindow stops recursing.
+// Combined with PAGE_SIZE=10000 above this guarantees every shipment in the
+// window is returned, without relying on the recursive halve-and-retry path.
+const CHUNK_MS = 1 * 86400000;
 const MAX_CONCURRENCY = 4;
 const RETRYABLE = new Set([502, 503, 504]);
 
