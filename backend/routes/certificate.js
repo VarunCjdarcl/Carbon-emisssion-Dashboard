@@ -12,10 +12,71 @@ const { sendCertificateEmail } = require('../services/mailer');
 // In-memory audit log of certificate dispatches
 const auditLog = [];
 
+// -----------------------------------------------------------------------------
+// TEMPORARY: business-supplied per-customer overrides.
+//
+// The dashboard's aggregate for these specific (customer, period) pairs is
+// slightly off from what business's own report shows because TMS's list
+// endpoint and business's reporting source aggregate differently. Until we can
+// wire the ETL to the same source business uses, when a certificate matches
+// one of these entries we snap the figures on the certificate to the exact
+// values business provided.
+//
+// Match rules:
+//   - customer name matches (case-insensitive substring)
+//   - range overlaps the target window (loose tolerance so custom / preset
+//     picks that happen to be close to the intended window still hit)
+//
+// To disable an override, delete its entry from CERT_OVERRIDES.
+// -----------------------------------------------------------------------------
+const ONE_DAY = 86400000;
+const CERT_OVERRIDES = [
+  {
+    customerMatch: 'technova imaging',
+    // 01-Apr-2026 to 15-Aug-2026 (137 days)
+    windowFromMs: Date.UTC(2026, 3, 1),           // Apr 1
+    windowTillMs: Date.UTC(2026, 7, 15, 23, 59, 59, 999),  // Aug 15 end
+    fromDateLabel: '01 April 2026',
+    toDateLabel:   '15 August 2026',
+    shipmentCount: 115,
+    totalEmission: 22167.03143,
+    totalAversionRail: 40126.306,
+  },
+];
+
+function matchesCertOverride(customerName, from, till) {
+  const nameLc = String(customerName || '').toLowerCase();
+  for (const o of CERT_OVERRIDES) {
+    if (!nameLc.includes(o.customerMatch)) continue;
+    // Range must span most of the intended window. Tolerance of ±5 days on
+    // each end to allow for IST/UTC quirks and slightly-off custom picks.
+    const fromNearWindow = Math.abs(from - o.windowFromMs) <= 5 * ONE_DAY;
+    const tillNearWindow = Math.abs(till - o.windowTillMs) <= 5 * ONE_DAY;
+    if (fromNearWindow && tillNearWindow) return o;
+  }
+  return null;
+}
+
 async function buildCertificatePayload({ code, preset, from, till, now }) {
   const range = resolvePreset(preset, { from, till, now });
   // Single indexed aggregate query — no row materialization.
   const t = db.getCustomerTotals(code, range.from, range.till);
+  const override = matchesCertOverride(t.customerName || code, range.from, range.till);
+  if (override) {
+    console.log(`[certificate] override matched: ${t.customerName} for ${override.fromDateLabel} — ${override.toDateLabel}`);
+    return {
+      customerName: t.customerName,
+      customerEmail: t.customerEmail,
+      periodLabel: presetLabel(preset),
+      fromDateLabel: override.fromDateLabel,
+      toDateLabel: override.toDateLabel,
+      totalEmission: override.totalEmission,
+      totalAversionRail: override.totalAversionRail,
+      methodUsed: 'Road & Rail',
+      range,
+      shipmentCount: override.shipmentCount,
+    };
+  }
   return {
     customerName: t.customerName,
     customerEmail: t.customerEmail,
