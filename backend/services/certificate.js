@@ -87,11 +87,9 @@ function generateCertificatePdf(payload, stream) {
   doc.moveDown(3);
   doc.fillColor(MUTED).font('Helvetica-Oblique').fontSize(8)
      .text(
-       'Disclaimer: Calculation methodology and reporting of logistics GHG emission is accredited ' +
-       'by GLEC (Global Logistics Emission Council) Framework 3.2 released by Smart Freight Centre and based on ' +
-       'ISO 14083 Principles. The shipper is enabled to track shipment level emission from the vehicle. ' +
-       'Precision of the result and reported emission are subject to the accuracy of input materials at the ' +
-       'time of display and circulation.',
+       'Disclaimer: Calculation methodology and reporting of logistics GHG emission is as per the ' +
+       'Global Logistics Emission Council (GLEC) Framework version 3.2 released by Smart Freight Centre (SFC), ' +
+       'integrated and compliant with ISO 14083 standard. CJ DARCL tracks shipment-level emissions.',
        50, doc.y,
        { align: 'justify', width: doc.page.width - 100 }
      );
@@ -191,10 +189,9 @@ function generateCertificateHtml(payload) {
   <tr>
     <td style="padding:24px 32px 28px 32px;font-size:11px;color:#666;font-style:italic;line-height:1.5">
       <strong style="color:#444">Disclaimer:</strong> Calculation methodology and reporting of logistics GHG
-      emission is accredited by GLEC (Global Logistics Emission Council) Framework 3.2 released by Smart
-      Freight Centre and based on ISO 14083 Principles. The shipper is enabled to track shipment level
-      emission from the vehicle. Precision of the result and reported emission are subject to the accuracy
-      of input materials at the time of display and circulation.
+      emission is as per the Global Logistics Emission Council (GLEC) Framework version 3.2 released by Smart
+      Freight Centre (SFC), integrated and compliant with ISO 14083 standard. CJ DARCL tracks shipment-level
+      emissions.
     </td>
   </tr>
 </table>`;
